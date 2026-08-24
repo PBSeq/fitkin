@@ -153,10 +153,12 @@
     </div>
     <div class="cta">
       <button class="btn" onclick="go(1)">let's go</button>
-      <div class="loginrow">
+      <div class="loginrow" id="loginRow">
         <button class="lbtn" onclick="fitkinLogin('google')"><span class="gmark">G</span> google</button>
         <button class="lbtn" onclick="fitkinLogin('apple')"> apple</button>
       </div>
+      <script>/* iOS 1.0 은 게스트 전용 (심사규정 4.8: 소셜로그인→애플로그인 의무). 1.1 에서 구글+애플 동시 점화 */
+      if(window.Capacitor||navigator.userAgent.includes('fitkin-ios'))document.getElementById('loginRow').style.display='none';</script>
       <button class="btn ghost" onclick="location.href='../'">what is fitkin?</button>
     </div>
   </section>
