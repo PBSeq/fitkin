@@ -5,27 +5,29 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>fitkin — find your fitness kin</title>
 <meta name="description" content="An app for people who love to move. Fitkin finds you workout partners nearby — matched by neighborhood, schedule, level, and how you like to train.">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
 <style>
-  :root{--ink:#14231c;--paper:#f6f4ee;--green:#1f7a4d;--lime:#c9f26e;--dim:#5c6b62}
+  :root{--ink:#16241c;--paper:#eef4ea;--green:#2f8a5b;--lime:#c8f169;--dim:#5e7266}
   *{margin:0;box-sizing:border-box}
-  body{font-family:'Avenir Next',Avenir,'Helvetica Neue',sans-serif;background:var(--paper);color:var(--ink);line-height:1.6}
+  body{font-family:'Space Grotesk','Avenir Next',Avenir,sans-serif;background:var(--paper);color:var(--ink);line-height:1.6}
   main{max-width:640px;margin:0 auto;padding:64px 24px}
   .logo{font-size:28px;font-weight:800;letter-spacing:-.5px}
   .logo span{color:var(--green)}
-  h1{font-size:clamp(38px,7vw,56px);font-weight:800;letter-spacing:-1.5px;line-height:1.1;margin:48px 0 20px}
+  h1{font-size:clamp(42px,8vw,64px);font-weight:700;letter-spacing:-2.2px;line-height:1.02;margin:48px 0 20px}
   h1 em{font-style:normal;color:var(--green)}
   .sub{font-size:20px;color:var(--dim);margin-bottom:36px}
   .cta{display:inline-block;background:var(--green);color:#fff;font-size:19px;font-weight:700;
-       padding:16px 34px;border-radius:999px;text-decoration:none;box-shadow:0 4px 0 #14523a}
-  .cta:active{transform:translateY(2px);box-shadow:0 2px 0 #14523a}
+       padding:16px 34px;border-radius:999px;text-decoration:none;
+       border:2px solid var(--ink);box-shadow:4px 4px 0 var(--ink)}
+  .cta:active{transform:translate(3px,3px);box-shadow:0 0 0 var(--ink)}
   .note{font-size:14px;color:var(--dim);margin-top:14px}
   .how{margin:64px 0}
   .how div{display:flex;gap:16px;margin:22px 0;align-items:flex-start}
-  .n{background:var(--lime);font-weight:800;border-radius:10px;min-width:40px;height:40px;
+  .n{background:var(--lime);border:2px solid var(--ink);font-weight:800;border-radius:12px;min-width:40px;height:40px;
      display:flex;align-items:center;justify-content:center;font-size:18px}
   .how h3{font-size:18px;margin-bottom:2px}
   .how p{color:var(--dim);font-size:16px}
-  .not{background:#fff;border:2px solid var(--ink);border-radius:16px;padding:22px 26px;margin:48px 0}
+  .not{background:#fff;border:2px solid var(--ink);border-radius:16px;padding:22px 26px;margin:48px 0;box-shadow:4px 4px 0 var(--ink)}
   .not p{font-size:17px}
   footer{color:var(--dim);font-size:13px;margin-top:72px}
 </style>
@@ -39,6 +41,7 @@
   Fitkin finds the people nearby who love it like you do.</p>
 
   <a class="cta" href="https://pathobrain.gumroad.com/l/fitkin">Join the waitlist — free</a>
+  <a class="cta" style="background:var(--lime);color:var(--ink);margin-left:6px" href="app/">Try the app ↗</a>
   <p class="note">Founding members get lifetime free matching. No spam, ever.</p>
 
   <div class="how">

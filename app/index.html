@@ -6,17 +6,19 @@
 <title>fitkin</title>
 <meta name="description" content="Find your fitness kin — workout partners matched by neighborhood, schedule, level, and vibe.">
 <link rel="manifest" href="manifest.json">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
 <meta name="theme-color" content="#f2f6f1">
 <style>
   :root{
-    --bg:#f2f6f1; --card:#ffffff; --ink:#1c2b23; --dim:#66786d;
-    --green:#3c8460; --green-soft:#e2efe6; --green-deep:#265c42;
-    --lime:#d7ecc8; --line:#e3eae2; --r:22px;
-    --shadow:0 6px 24px rgba(38,92,66,.08);
+    --bg:#eef4ea; --card:#ffffff; --ink:#16241c; --dim:#5e7266;
+    --green:#2f8a5b; --green-soft:#ddefe2; --green-deep:#1e5c3d;
+    --lime:#c8f169; --line:#16241c; --r:24px;
+    --shadow:4px 4px 0 rgba(22,36,28,.9);
   }
   *{margin:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
   html,body{height:100%}
-  body{font-family:-apple-system,'SF Pro Text','Avenir Next',Roboto,sans-serif;
+  body{font-family:'Space Grotesk',-apple-system,'SF Pro Text',Roboto,sans-serif;
        background:var(--bg);color:var(--ink);line-height:1.5;
        display:flex;justify-content:center}
   #phone{width:100%;max-width:430px;min-height:100dvh;display:flex;flex-direction:column;
@@ -27,41 +29,43 @@
 
   .logo{font-weight:800;font-size:22px;letter-spacing:-.4px}
   .logo b{color:var(--green)}
-  h1{font-size:clamp(30px,8vw,38px);font-weight:800;letter-spacing:-1px;line-height:1.15;margin:14px 0 8px}
+  h1{font-size:clamp(34px,9vw,44px);font-weight:700;letter-spacing:-1.8px;line-height:1.05;margin:14px 0 10px}
   h1 em{font-style:normal;color:var(--green)}
   .sub{color:var(--dim);font-size:16.5px}
   .step-tag{display:inline-block;background:var(--lime);color:var(--green-deep);
             font-size:13px;font-weight:700;border-radius:99px;padding:4px 14px;margin:18px 0 4px}
 
   .chips{display:flex;flex-wrap:wrap;gap:10px;margin:18px 0}
-  .chip{border:1.5px solid var(--line);background:var(--card);border-radius:99px;
+  .chip{border:2px solid var(--ink);background:var(--card);border-radius:99px;
         padding:11px 18px;font-size:15.5px;font-weight:600;color:var(--ink);
         cursor:pointer;transition:.15s;user-select:none}
-  .chip.sel{background:var(--green);border-color:var(--green);color:#fff;
-            box-shadow:0 4px 14px rgba(60,132,96,.3)}
+  .chip.sel{background:var(--lime);border-color:var(--ink);color:var(--ink);
+            box-shadow:3px 3px 0 var(--ink);transform:translate(-1px,-1px)}
 
   .opt-group{margin:16px 0}
   .opt-label{font-size:13.5px;font-weight:700;color:var(--dim);text-transform:uppercase;
              letter-spacing:.6px;margin-bottom:8px}
-  .seg{display:flex;background:var(--card);border:1.5px solid var(--line);
+  .seg{display:flex;background:var(--card);border:2px solid var(--ink);
        border-radius:16px;padding:4px;gap:4px}
   .seg button{flex:1;border:0;background:none;border-radius:12px;padding:11px 6px;
               font-size:14.5px;font-weight:650;color:var(--dim);cursor:pointer;transition:.15s}
-  .seg button.sel{background:var(--green-soft);color:var(--green-deep)}
+  .seg button.sel{background:var(--lime);color:var(--ink)}
 
   .grid7{display:grid;grid-template-columns:repeat(7,1fr);gap:7px;margin-top:8px}
-  .day{aspect-ratio:1;border-radius:14px;border:1.5px solid var(--line);background:var(--card);
+  .day{aspect-ratio:1;border-radius:14px;border:2px solid var(--ink);background:var(--card);
        font-size:13px;font-weight:700;color:var(--dim);cursor:pointer;transition:.15s;
        display:flex;align-items:center;justify-content:center}
-  .day.sel{background:var(--green);border-color:var(--green);color:#fff}
+  .day.sel{background:var(--lime);color:var(--ink);box-shadow:2px 2px 0 var(--ink)}
 
   .cta{margin-top:auto;padding-top:22px}
-  .btn{width:100%;border:0;background:var(--green);color:#fff;font-size:17.5px;font-weight:750;
-       padding:17px;border-radius:99px;cursor:pointer;box-shadow:var(--shadow);transition:.15s}
+  .btn{width:100%;border:2px solid var(--ink);background:var(--green);color:#fff;font-size:17.5px;
+       font-weight:700;padding:17px;border-radius:99px;cursor:pointer;
+       box-shadow:var(--shadow);transition:.12s}
+  .btn:active:not(:disabled){transform:translate(3px,3px);box-shadow:0 0 0 var(--ink)}
   .btn:disabled{opacity:.35;box-shadow:none}
-  .btn.ghost{background:none;color:var(--dim);box-shadow:none;font-weight:600;padding:12px}
+  .btn.ghost{background:none;border:0;color:var(--dim);box-shadow:none;font-weight:600;padding:12px}
 
-  .card{background:var(--card);border-radius:var(--r);padding:20px 22px;box-shadow:var(--shadow);margin:10px 0}
+  .card{background:var(--card);border:2px solid var(--ink);border-radius:var(--r);padding:20px 22px;box-shadow:var(--shadow);margin:12px 0}
   .me{display:flex;gap:14px;align-items:center}
   .ava{width:56px;height:56px;border-radius:50%;background:var(--lime);display:flex;
        align-items:center;justify-content:center;font-size:26px}
@@ -89,7 +93,10 @@
   <section class="screen on" id="s0">
     <div class="logo">fit<b>kin</b></div>
     <div style="margin:auto 0;padding:40px 0">
-      <div style="font-size:64px;margin-bottom:18px">🏃‍♀️🤝🏊‍♂️</div>
+      <div style="margin-bottom:18px">
+        <span style="font-size:56px;display:inline-block;transform:rotate(-8deg)">🏃‍♀️</span>
+        <span style="font-size:64px;display:inline-block;transform:rotate(4deg) translateY(-6px)">🤝</span>
+        <span style="font-size:56px;display:inline-block;transform:rotate(9deg)">🏊‍♂️</span></div>
       <h1>Find your <em>fitness kin.</em></h1>
       <p class="sub">People near you who love to move the way you do —
       matched by neighborhood, schedule, level, and vibe.</p>
