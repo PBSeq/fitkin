@@ -39,12 +39,18 @@ const rand = n => [...crypto.getRandomValues(new Uint8Array(n))].map(b => "abcde
 window.fitkinPublish = async function () {
   const s = st();
   if (!s.name || !s.hood) return;
-  if (!s.id) { s.id = rand(12); s.editKey = rand(24); put(s); }
-  await setDoc(doc(db, "profiles", s.id), {
-    name: s.name.slice(0, 30), sports: s.sports, vibe: s.vibe, days: s.days,
-    hood: s.hood.trim().toLowerCase().slice(0, 40), editKey: s.editKey, ts: Date.now(),
-  });
-  s.published = Date.now(); put(s);
+  if (!s.id) { s.id = rand(12); put(s); }
+  try {
+    // 1.0: 프로필은 생성 후 불변(immutable) — 비밀키를 서버에 두지 않기 위한 설계.
+    // '카드 다시 만들기'는 새 id 로 새 문서를 만든다.
+    await setDoc(doc(db, "profiles", s.id), {
+      name: s.name.slice(0, 30), sports: s.sports, vibe: s.vibe, days: s.days,
+      hood: s.hood.trim().toLowerCase().slice(0, 40), ts: Date.now(),
+    });
+    s.published = Date.now(); put(s);
+  } catch (e) {
+    toast("offline — your card is saved on this phone and will publish later");
+  }
   paintHome();
 };
 
