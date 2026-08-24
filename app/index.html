@@ -4,86 +4,106 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>fitkin</title>
-<meta name="description" content="Find your fitness kin — workout partners matched by neighborhood, schedule, level, and vibe.">
+<meta name="description" content="find your fitness kin — workout people matched by neighborhood, schedule, level, and vibe.">
 <link rel="manifest" href="manifest.json">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
-<meta name="theme-color" content="#f2f6f1">
+<meta name="theme-color" content="#0c120e">
 <style>
   :root{
-    --bg:#eef4ea; --card:#ffffff; --ink:#16241c; --dim:#5e7266;
-    --green:#2f8a5b; --green-soft:#ddefe2; --green-deep:#1e5c3d;
-    --lime:#c8f169; --line:#16241c; --r:24px;
-    --shadow:4px 4px 0 rgba(22,36,28,.9);
+    --bg:#0c120e; --card:#141c16; --card2:#1a241c; --ink:#f2f8ee; --dim:#8aa393;
+    --volt:#ccf24e; --volt-deep:#a8d32a; --mint:#bfe8cd; --line:#26332a;
+    --r:24px; --glow:0 0 34px rgba(204,242,78,.16);
   }
   *{margin:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
   html,body{height:100%}
   body{font-family:'Space Grotesk',-apple-system,'SF Pro Text',Roboto,sans-serif;
        background:var(--bg);color:var(--ink);line-height:1.5;
        display:flex;justify-content:center}
+  /* 필름 그레인 */
+  body::before{content:"";position:fixed;inset:0;pointer-events:none;opacity:.5;z-index:9;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence baseFrequency='.85' numOctaves='2'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .04 0'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E")}
   #phone{width:100%;max-width:430px;min-height:100dvh;display:flex;flex-direction:column;
-         padding:max(20px,env(safe-area-inset-top)) 20px calc(20px + env(safe-area-inset-bottom))}
+         padding:max(18px,env(safe-area-inset-top)) 20px calc(18px + env(safe-area-inset-bottom))}
   .screen{display:none;flex-direction:column;flex:1;animation:in .35s ease}
   .screen.on{display:flex}
   @keyframes in{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
 
-  .logo{font-weight:800;font-size:22px;letter-spacing:-.4px}
-  .logo b{color:var(--green)}
-  h1{font-size:clamp(34px,9vw,44px);font-weight:700;letter-spacing:-1.8px;line-height:1.05;margin:14px 0 10px}
-  h1 em{font-style:normal;color:var(--green)}
+  .logo{font-weight:700;font-size:22px;letter-spacing:-.4px}
+  .logo b{color:var(--volt)}
+  h1{font-size:clamp(36px,10vw,50px);font-weight:700;letter-spacing:-2px;line-height:.98;
+     margin:14px 0 12px;text-transform:lowercase}
+  h1 em{font-style:normal;color:var(--volt)}
   .sub{color:var(--dim);font-size:16.5px}
-  .step-tag{display:inline-block;background:var(--lime);color:var(--green-deep);
+  .step-tag{display:inline-block;background:var(--volt);color:#0c120e;
             font-size:13px;font-weight:700;border-radius:99px;padding:4px 14px;margin:18px 0 4px}
 
+  /* 마퀴 */
+  .mq{overflow:hidden;white-space:nowrap;border-top:1px solid var(--line);border-bottom:1px solid var(--line);
+      padding:9px 0;margin:20px -20px 0;font-weight:700;font-size:14px;letter-spacing:2.5px;color:var(--mint)}
+  .mq div{display:inline-block;animation:mq 18s linear infinite}
+  @keyframes mq{to{transform:translateX(-50%)}}
+
   .chips{display:flex;flex-wrap:wrap;gap:10px;margin:18px 0}
-  .chip{border:2px solid var(--ink);background:var(--card);border-radius:99px;
+  .chip{border:1.5px solid var(--line);background:var(--card);border-radius:99px;
         padding:11px 18px;font-size:15.5px;font-weight:600;color:var(--ink);
         cursor:pointer;transition:.15s;user-select:none}
-  .chip.sel{background:var(--lime);border-color:var(--ink);color:var(--ink);
-            box-shadow:3px 3px 0 var(--ink);transform:translate(-1px,-1px)}
+  .chip.sel{background:var(--volt);border-color:var(--volt);color:#0c120e;
+            box-shadow:var(--glow);transform:rotate(-1.2deg) scale(1.03)}
 
   .opt-group{margin:16px 0}
-  .opt-label{font-size:13.5px;font-weight:700;color:var(--dim);text-transform:uppercase;
-             letter-spacing:.6px;margin-bottom:8px}
-  .seg{display:flex;background:var(--card);border:2px solid var(--ink);
+  .opt-label{font-size:12.5px;font-weight:700;color:var(--dim);text-transform:uppercase;
+             letter-spacing:1.4px;margin-bottom:8px}
+  .seg{display:flex;background:var(--card);border:1.5px solid var(--line);
        border-radius:16px;padding:4px;gap:4px}
-  .seg button{flex:1;border:0;background:none;border-radius:12px;padding:11px 6px;
-              font-size:14.5px;font-weight:650;color:var(--dim);cursor:pointer;transition:.15s}
-  .seg button.sel{background:var(--lime);color:var(--ink)}
+  .seg button{flex:1;border:0;background:none;border-radius:12px;padding:12px 6px;
+              font-family:inherit;font-size:14.5px;font-weight:650;color:var(--dim);cursor:pointer;transition:.15s}
+  .seg button.sel{background:var(--volt);color:#0c120e}
 
   .grid7{display:grid;grid-template-columns:repeat(7,1fr);gap:7px;margin-top:8px}
-  .day{aspect-ratio:1;border-radius:14px;border:2px solid var(--ink);background:var(--card);
-       font-size:13px;font-weight:700;color:var(--dim);cursor:pointer;transition:.15s;
+  .day{aspect-ratio:1;border-radius:14px;border:1.5px solid var(--line);background:var(--card);
+       font-family:inherit;font-size:13px;font-weight:700;color:var(--dim);cursor:pointer;transition:.15s;
        display:flex;align-items:center;justify-content:center}
-  .day.sel{background:var(--lime);color:var(--ink);box-shadow:2px 2px 0 var(--ink)}
+  .day.sel{background:var(--volt);border-color:var(--volt);color:#0c120e;box-shadow:var(--glow)}
 
   .cta{margin-top:auto;padding-top:22px}
-  .btn{width:100%;border:2px solid var(--ink);background:var(--green);color:#fff;font-size:17.5px;
-       font-weight:700;padding:17px;border-radius:99px;cursor:pointer;
-       box-shadow:var(--shadow);transition:.12s}
-  .btn:active:not(:disabled){transform:translate(3px,3px);box-shadow:0 0 0 var(--ink)}
-  .btn:disabled{opacity:.35;box-shadow:none}
-  .btn.ghost{background:none;border:0;color:var(--dim);box-shadow:none;font-weight:600;padding:12px}
+  .btn{width:100%;border:0;background:var(--volt);color:#0c120e;font-family:inherit;
+       font-size:17.5px;font-weight:700;padding:17px;border-radius:99px;cursor:pointer;
+       box-shadow:var(--glow);transition:.12s}
+  .btn:active:not(:disabled){transform:scale(.97)}
+  .btn:disabled{opacity:.25;box-shadow:none}
+  .btn.ghost{background:none;color:var(--dim);box-shadow:none;font-weight:600;padding:12px}
 
-  .card{background:var(--card);border:2px solid var(--ink);border-radius:var(--r);padding:20px 22px;box-shadow:var(--shadow);margin:12px 0}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);
+        padding:20px 22px;margin:12px 0}
   .me{display:flex;gap:14px;align-items:center}
-  .ava{width:56px;height:56px;border-radius:50%;background:var(--lime);display:flex;
-       align-items:center;justify-content:center;font-size:26px}
+  .ava{width:56px;height:56px;border-radius:18px;background:var(--card2);border:1.5px solid var(--line);
+       display:flex;align-items:center;justify-content:center;font-size:26px;transform:rotate(-4deg)}
   .me h3{font-size:18px}
   .me p{font-size:14px;color:var(--dim)}
   .tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
-  .tag{background:var(--green-soft);color:var(--green-deep);font-size:13px;font-weight:650;
-       border-radius:99px;padding:4px 12px}
+  .tag{background:var(--card2);color:var(--mint);font-size:13px;font-weight:650;
+       border:1px solid var(--line);border-radius:99px;padding:4px 12px}
 
-  .pulse{width:120px;height:120px;margin:26px auto 10px;border-radius:50%;
-         background:var(--green-soft);display:flex;align-items:center;justify-content:center;
-         font-size:52px;position:relative}
+  .pulse{width:110px;height:110px;margin:20px auto 8px;border-radius:50%;
+         background:var(--card2);border:1.5px solid var(--line);display:flex;align-items:center;
+         justify-content:center;font-size:48px;position:relative}
   .pulse::after{content:"";position:absolute;inset:-14px;border-radius:50%;
-                border:2px solid var(--green);opacity:.35;animation:pp 2s ease-out infinite}
-  @keyframes pp{from{transform:scale(.8);opacity:.5}to{transform:scale(1.25);opacity:0}}
+                border:1.5px solid var(--volt);opacity:.4;animation:pp 2s ease-out infinite}
+  @keyframes pp{from{transform:scale(.8);opacity:.55}to{transform:scale(1.28);opacity:0}}
   .count{text-align:center}
-  .count b{font-size:34px;letter-spacing:-1px;color:var(--green-deep)}
+  .count b{font-size:30px;letter-spacing:-1px;color:var(--volt)}
   .count p{color:var(--dim);font-size:15px}
+
+  .qr{display:flex;gap:16px;align-items:center}
+  .qrbox{width:92px;height:92px;border-radius:16px;background:repeating-conic-gradient(var(--card2) 0 25%,var(--card) 0 50%) 0 0/18px 18px;
+         border:1.5px solid var(--line);display:flex;align-items:center;justify-content:center;
+         font-size:30px;flex:none;transform:rotate(3deg)}
+  .qr h3{font-size:17px}
+  .qr p{font-size:13.5px;color:var(--dim)}
+  .soon{display:inline-block;background:var(--card2);border:1px solid var(--line);color:var(--mint);
+        font-size:11.5px;font-weight:700;letter-spacing:1px;border-radius:99px;padding:2px 10px;
+        text-transform:uppercase;margin-top:6px}
 </style>
 </head>
 <body>
@@ -92,53 +112,54 @@
   <!-- 0 · Welcome -->
   <section class="screen on" id="s0">
     <div class="logo">fit<b>kin</b></div>
-    <div style="margin:auto 0;padding:40px 0">
-      <div style="margin-bottom:18px">
-        <span style="font-size:56px;display:inline-block;transform:rotate(-8deg)">🏃‍♀️</span>
-        <span style="font-size:64px;display:inline-block;transform:rotate(4deg) translateY(-6px)">🤝</span>
-        <span style="font-size:56px;display:inline-block;transform:rotate(9deg)">🏊‍♂️</span></div>
-      <h1>Find your <em>fitness kin.</em></h1>
-      <p class="sub">People near you who love to move the way you do —
-      matched by neighborhood, schedule, level, and vibe.</p>
+    <div style="margin:auto 0;padding:28px 0">
+      <div style="margin-bottom:16px">
+        <span style="font-size:52px;display:inline-block;transform:rotate(-9deg)">🏃‍♀️</span>
+        <span style="font-size:60px;display:inline-block;transform:rotate(4deg) translateY(-6px)">🤝</span>
+        <span style="font-size:52px;display:inline-block;transform:rotate(10deg)">🏊‍♂️</span></div>
+      <h1>find your <em>fitness kin.</em></h1>
+      <p class="sub">your people are already out there — running, lifting,
+      swimming at 6am. we just introduce you.</p>
+      <div class="mq"><div>RUN&nbsp;·&nbsp;LIFT&nbsp;·&nbsp;SWIM&nbsp;·&nbsp;CLIMB&nbsp;·&nbsp;REPEAT&nbsp;·&nbsp;RUN&nbsp;·&nbsp;LIFT&nbsp;·&nbsp;SWIM&nbsp;·&nbsp;CLIMB&nbsp;·&nbsp;REPEAT&nbsp;·&nbsp;</div></div>
     </div>
     <div class="cta">
-      <button class="btn" onclick="go(1)">Get started</button>
-      <button class="btn ghost" onclick="location.href='../'">What is fitkin?</button>
+      <button class="btn" onclick="go(1)">let's go</button>
+      <button class="btn ghost" onclick="location.href='../'">what is fitkin?</button>
     </div>
   </section>
 
   <!-- 1 · Sports -->
   <section class="screen" id="s1">
     <div class="logo">fit<b>kin</b></div>
-    <span class="step-tag">1 of 3 · your sports</span>
-    <h1>What moves you?</h1>
-    <p class="sub">Pick as many as you like.</p>
+    <span class="step-tag">1/3 · your things</span>
+    <h1>what moves you?</h1>
+    <p class="sub">pick your things. all of them. no gatekeeping.</p>
     <div class="chips" id="sports"></div>
-    <div class="cta"><button class="btn" id="b1" disabled onclick="go(2)">Next</button></div>
+    <div class="cta"><button class="btn" id="b1" disabled onclick="go(2)">next</button></div>
   </section>
 
   <!-- 2 · Vibe -->
   <section class="screen" id="s2">
     <div class="logo">fit<b>kin</b></div>
-    <span class="step-tag">2 of 3 · your vibe</span>
-    <h1>How do you like to train?</h1>
-    <div class="opt-group"><div class="opt-label">Time of day</div>
-      <div class="seg" data-k="time"><button>🌅 Mornings</button><button>☀️ Daytime</button><button>🌙 Evenings</button></div></div>
-    <div class="opt-group"><div class="opt-label">Energy</div>
-      <div class="seg" data-k="mode"><button>😌 For the joy</button><button>🔥 Competitive</button></div></div>
-    <div class="opt-group"><div class="opt-label">Level</div>
-      <div class="seg" data-k="level"><button>New-ish</button><button>Steady</button><button>Serious</button></div></div>
-    <div class="cta"><button class="btn" id="b2" disabled onclick="go(3)">Next</button></div>
+    <span class="step-tag">2/3 · your vibe</span>
+    <h1>how do you move?</h1>
+    <div class="opt-group"><div class="opt-label">when</div>
+      <div class="seg" data-k="time"><button>🌅 mornings</button><button>☀️ daytime</button><button>🌙 nights</button></div></div>
+    <div class="opt-group"><div class="opt-label">energy</div>
+      <div class="seg" data-k="mode"><button>😌 for the joy</button><button>🔥 competitive</button></div></div>
+    <div class="opt-group"><div class="opt-label">level</div>
+      <div class="seg" data-k="level"><button>new-ish</button><button>steady</button><button>serious</button></div></div>
+    <div class="cta"><button class="btn" id="b2" disabled onclick="go(3)">next</button></div>
   </section>
 
   <!-- 3 · Schedule -->
   <section class="screen" id="s3">
     <div class="logo">fit<b>kin</b></div>
-    <span class="step-tag">3 of 3 · your week</span>
-    <h1>When are you free?</h1>
-    <p class="sub">Tap the days you usually can move.</p>
+    <span class="step-tag">3/3 · your week</span>
+    <h1>when do you show up?</h1>
+    <p class="sub">tap the days you can usually move.</p>
     <div class="grid7" id="days"></div>
-    <div class="cta"><button class="btn" id="b3" disabled onclick="finish()">See my kin profile</button></div>
+    <div class="cta"><button class="btn" id="b3" disabled onclick="finish()">build my kin card</button></div>
   </section>
 
   <!-- 4 · Home -->
@@ -146,28 +167,34 @@
     <div class="logo">fit<b>kin</b></div>
     <div class="card"><div class="me">
       <div class="ava" id="hAva">🏃</div>
-      <div><h3>Your kin profile</h3><p id="hLine"></p></div>
+      <div><h3>your kin card</h3><p id="hLine"></p></div>
     </div><div class="tags" id="hTags"></div></div>
+
+    <div class="card"><div class="qr">
+      <div class="qrbox">📱</div>
+      <div><h3>your kin code</h3>
+        <p>met someone at the gym? they scan, you're kin. no numbers exchanged.</p>
+        <span class="soon">coming with launch</span></div>
+    </div></div>
 
     <div class="card" style="text-align:center">
       <div class="pulse">📍</div>
       <div class="count"><b id="hCount"></b>
-        <p>people on the waitlist share your vibe.<br>
-        Matching opens neighborhood by neighborhood —<br>founding members go first.</p></div>
+        <p>matching opens neighborhood by neighborhood.<br>founding members go first.</p></div>
     </div>
 
     <div class="cta">
       <button class="btn" onclick="location.href='https://pathobrain.gumroad.com/l/fitkin'">
-        Claim founding member spot — free</button>
-      <button class="btn ghost" onclick="reset()">Redo my profile</button>
+        claim founding spot — free</button>
+      <button class="btn ghost" onclick="reset()">redo my card</button>
     </div>
   </section>
 </div>
 
 <script>
-const SPORTS=[["🏃","Running"],["🏋️","Lifting"],["🎾","Tennis"],["🏊","Swimming"],["🚴","Cycling"],
-  ["🥾","Hiking"],["🧘","Yoga"],["🏀","Basketball"],["⚽","Soccer"],["🏓","Pickleball"],
-  ["🥊","Boxing"],["🧗","Climbing"]];
+const SPORTS=[["🏃","running"],["🏋️","lifting"],["🎾","tennis"],["🏊","swimming"],["🚴","cycling"],
+  ["🥾","hiking"],["🧘","yoga"],["🏀","hoops"],["⚽","soccer"],["🏓","pickleball"],
+  ["🥊","boxing"],["🧗","climbing"]];
 const DAYS=["S","M","T","W","T","F","S"];
 const st=JSON.parse(localStorage.getItem("fitkin")||"{}");
 st.sports=st.sports||[]; st.days=st.days||[]; st.vibe=st.vibe||{};
@@ -177,7 +204,6 @@ function go(n){document.querySelectorAll(".screen").forEach(s=>s.classList.remov
   $("#s"+n).classList.add("on");window.scrollTo(0,0);save()}
 function save(){localStorage.setItem("fitkin",JSON.stringify(st))}
 
-// sports chips
 SPORTS.forEach(([e,n])=>{const c=document.createElement("div");c.className="chip";
   c.textContent=e+" "+n; if(st.sports.includes(n))c.classList.add("sel");
   c.onclick=()=>{c.classList.toggle("sel");
@@ -186,15 +212,13 @@ SPORTS.forEach(([e,n])=>{const c=document.createElement("div");c.className="chip
   $("#sports").appendChild(c)});
 $("#b1").disabled=!st.sports.length;
 
-// vibe segments
 document.querySelectorAll(".seg").forEach(seg=>{const k=seg.dataset.k;
-  [...seg.children].forEach((b,i)=>{ if(st.vibe[k]===b.textContent)b.classList.add("sel");
+  [...seg.children].forEach(b=>{ if(st.vibe[k]===b.textContent)b.classList.add("sel");
     b.onclick=()=>{[...seg.children].forEach(x=>x.classList.remove("sel"));
       b.classList.add("sel");st.vibe[k]=b.textContent;
       $("#b2").disabled=!(st.vibe.time&&st.vibe.mode&&st.vibe.level);save()}})});
 $("#b2").disabled=!(st.vibe.time&&st.vibe.mode&&st.vibe.level);
 
-// days
 DAYS.forEach((d,i)=>{const b=document.createElement("button");b.className="day";b.textContent=d;
   if(st.days.includes(i))b.classList.add("sel");
   b.onclick=()=>{b.classList.toggle("sel");
@@ -209,8 +233,7 @@ function finish(){
   $("#hLine").textContent=[st.vibe.time,st.vibe.mode,st.vibe.level].filter(Boolean).join(" · ");
   $("#hTags").innerHTML=st.sports.map(s=>`<span class="tag">${s}</span>`).join("")
     +`<span class="tag">${st.days.length} days/week</span>`;
-  // 정직한 숫자: 실제 대기명단 수를 모르는 클라이언트는 범위를 단정하지 않는다
-  $("#hCount").textContent="You're early";
+  $("#hCount").textContent="you're early. good.";
   st.done=Date.now();save();go(4)}
 if(st.done)finish();
 function reset(){localStorage.removeItem("fitkin");location.reload()}
