@@ -1,0 +1,37 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // 프로필: 매칭이 제품이므로 읽기는 공개(연락처·정밀위치는 애초에 저장하지 않는다).
+    // 쓰기는 생성 시 심은 editKey 를 아는 클라이언트(=본인 기기)만.
+    match /profiles/{id} {
+      allow read: if true;
+      allow create: if request.resource.data.keys().hasAll(['name','sports','vibe','days','hood','editKey','ts'])
+                    && request.resource.data.name is string
+                    && request.resource.data.name.size() <= 30
+                    && request.resource.data.editKey is string
+                    && request.resource.data.editKey.size() >= 20
+                    && !('contact' in request.resource.data)
+                    && !('lat' in request.resource.data)
+                    && !('lng' in request.resource.data);
+      allow update, delete: if request.resource == null
+                    ? request.auth != null   // delete 는 v0.3(정식 인증)에서
+                    : request.resource.data.editKey == resource.data.editKey
+                      && !('contact' in request.resource.data);
+    }
+
+    // 킨 링크: QR 스캔으로 맺어지는 버디 관계. 생성만 허용(위조 방지: 두 프로필 id + linkKey).
+    match /links/{id} {
+      allow read: if true;
+      allow create: if request.resource.data.keys().hasAll(['a','b','ts'])
+                    && request.resource.data.a is string
+                    && request.resource.data.b is string
+                    && request.resource.data.a != request.resource.data.b;
+      allow update, delete: if false;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
