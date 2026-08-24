@@ -107,5 +107,6 @@ function toast(msg) {
 }
 
 window.fitkinHome = paintHome;
+window.addEventListener("hashchange", handleKinLink);   // 앱 켜둔 채 QR 링크 수신
 handleKinLink();
 if (st().done) paintHome();
