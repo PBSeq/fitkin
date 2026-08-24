@@ -11,6 +11,25 @@ const app = initializeApp({
   authDomain: "fitkin-buddy.firebaseapp.com",
 });
 const db = getFirestore(app);
+
+// ── 소셜 로그인 (v0.3 선행 배선 — 콘솔에서 제공자 켜지면 즉시 작동) ──
+window.fitkinLogin = async function (kind) {
+  try {
+    const { getAuth, signInWithPopup, GoogleAuthProvider, OAuthProvider } =
+      await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js");
+    const auth = getAuth(app);
+    const provider = kind === "apple" ? new OAuthProvider("apple.com") : new GoogleAuthProvider();
+    const cred = await signInWithPopup(auth, provider);
+    const s = st(); s.uid = cred.user.uid; s.loginName = cred.user.displayName || ""; put(s);
+    toast("signed in" + (s.loginName ? " as " + s.loginName.split(" ")[0] : "") + " ✓");
+    const nameEl = document.getElementById("fName");
+    if (nameEl && !nameEl.value && s.loginName) { nameEl.value = s.loginName.split(" ")[0]; nameEl.dispatchEvent(new Event("input")); }
+  } catch (e) {
+    if (String(e.code).includes("configuration-not-found") || String(e.code).includes("operation-not-allowed"))
+      toast("login opens with the next update — continue as guest for now");
+    else if (!String(e.code).includes("popup-closed")) toast("login hiccup — guest mode works fine");
+  }
+};
 const $ = q => document.querySelector(q);
 const st = () => JSON.parse(localStorage.getItem("fitkin") || "{}");
 const put = s => localStorage.setItem("fitkin", JSON.stringify(s));
@@ -58,8 +77,48 @@ async function handleKinLink() {
   if (!them.exists()) { toast("that kin code doesn't exist (yet)"); return; }
   const linkId = [s.id, other].sort().join("_");
   await setDoc(doc(db, "links", linkId), { a: s.id, b: other, ts: Date.now() });
-  toast("you're kin with " + (them.data().name || "someone") + " 🎉");
+  const shared = overlap(s.sports, them.data().sports);
+  toast("you're kin with " + (them.data().name || "someone") + " 🎉" +
+        (shared.length ? " — you both: " + shared.join(" · ") : ""));
   paintKin();
+}
+
+// ── 인앱 QR 스캐너 (jsQR + 카메라) ──
+let scanStream = null, scanRAF = 0;
+window.fitkinScan = async function () {
+  const box = document.getElementById("scanner"), vid = document.getElementById("scanVid");
+  try {
+    scanStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+  } catch (e) { toast("camera permission needed to scan"); return; }
+  vid.srcObject = scanStream; await vid.play();
+  box.classList.add("on");
+  const cv = document.createElement("canvas"), cx = cv.getContext("2d", { willReadFrequently: true });
+  const tick = () => {
+    if (!scanStream) return;
+    if (vid.videoWidth) {
+      cv.width = vid.videoWidth; cv.height = vid.videoHeight;
+      cx.drawImage(vid, 0, 0);
+      const img = cx.getImageData(0, 0, cv.width, cv.height);
+      const hit = window.jsQR && jsQR(img.data, img.width, img.height);
+      if (hit && /#kin=[a-z0-9]+/.test(hit.data)) {
+        window.fitkinScanStop();
+        location.hash = hit.data.slice(hit.data.indexOf("#kin="));
+        return;
+      }
+    }
+    scanRAF = requestAnimationFrame(tick);
+  };
+  scanRAF = requestAnimationFrame(tick);
+};
+window.fitkinScanStop = function () {
+  cancelAnimationFrame(scanRAF);
+  if (scanStream) { scanStream.getTracks().forEach(t => t.stop()); scanStream = null; }
+  document.getElementById("scanner").classList.remove("on");
+};
+
+// ── 겹치는 운동 = 매직 모먼트 ──
+function overlap(mine, theirs) {
+  return (mine || []).filter(s => (theirs || []).includes(s));
 }
 
 // ── 킨 목록 ──
@@ -81,9 +140,15 @@ async function myKin() {
 async function paintKin() {
   const wrap = $("#kinList"); if (!wrap) return;
   const kin = await myKin();
+  const mine = st().sports || [];
   wrap.innerHTML = kin.length
-    ? kin.map(k => `<div class="kinrow"><span class="kava">${["🏃","🎾","🏋️","🏊"][k.name.length % 4]}</span>
-        <div><b>${k.name}</b><p>${(k.sports || []).slice(0, 3).join(" · ")} · ${k.hood}</p></div></div>`).join("")
+    ? kin.map(k => {
+        const shared = overlap(mine, k.sports);
+        return `<div class="kinrow"><span class="kava">${["🏃","🎾","🏋️","🏊"][k.name.length % 4]}</span>
+          <div><b>${k.name}</b><p>${shared.length
+            ? `<span class="overlap">you both: ${shared.join(" · ")}</span> · ${k.hood}`
+            : (k.sports || []).slice(0, 3).join(" · ") + " · " + k.hood}</p></div></div>`;
+      }).join("")
     : `<p class="dimtext">no kin yet — show your code to someone at the gym.</p>`;
 }
 

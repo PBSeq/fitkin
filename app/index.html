@@ -115,8 +115,24 @@
   .dimtext{color:var(--dim);font-size:14.5px}
   #toast{position:fixed;left:50%;bottom:36px;transform:translate(-50%,20px);background:var(--volt);
          color:#0c120e;font-weight:700;font-size:15px;padding:12px 22px;border-radius:99px;
-         opacity:0;pointer-events:none;transition:.25s;z-index:99}
+         opacity:0;pointer-events:none;transition:.25s;z-index:99;max-width:88vw;text-align:center}
   #toast.show{opacity:1;transform:translate(-50%,0)}
+  .scanbtn{margin-top:10px;background:var(--card2);border:1.5px solid var(--line);color:var(--mint);
+           font-family:inherit;font-size:14px;font-weight:700;border-radius:99px;padding:9px 16px;cursor:pointer}
+  .loginrow{display:flex;gap:10px;margin-top:12px}
+  .lbtn{flex:1;background:var(--card);border:1.5px solid var(--line);color:var(--ink);
+        font-family:inherit;font-size:15px;font-weight:700;border-radius:99px;padding:13px;cursor:pointer}
+  .lbtn:active{transform:scale(.97)}
+  .gmark{display:inline-block;background:var(--volt);color:#0c120e;border-radius:6px;
+         width:20px;height:20px;line-height:20px;text-align:center;font-weight:800;font-size:13px}
+  #scanner{position:fixed;inset:0;background:#000c;backdrop-filter:blur(6px);z-index:50;
+           display:none;flex-direction:column;align-items:center;justify-content:center;gap:18px}
+  #scanner.on{display:flex}
+  #scanner video{width:min(86vw,380px);aspect-ratio:1;object-fit:cover;border-radius:24px;
+                 border:2px solid var(--volt)}
+  #scanner p{color:var(--mint);font-weight:700}
+  #scanner .btn{width:min(86vw,380px)}
+  .overlap{color:var(--volt);font-weight:700}
 </style>
 </head>
 <body>
@@ -137,6 +153,10 @@
     </div>
     <div class="cta">
       <button class="btn" onclick="go(1)">let's go</button>
+      <div class="loginrow">
+        <button class="lbtn" onclick="fitkinLogin('google')"><span class="gmark">G</span> google</button>
+        <button class="lbtn" onclick="fitkinLogin('apple')"> apple</button>
+      </div>
       <button class="btn ghost" onclick="location.href='../'">what is fitkin?</button>
     </div>
   </section>
@@ -190,7 +210,8 @@
     <div class="card"><div class="qr">
       <div class="qrbox" id="qrCanvas">📱</div>
       <div><h3>your kin code</h3>
-        <p>met someone at the gym? they scan, you're kin. no numbers exchanged.</p></div>
+        <p>met someone at the gym? they scan, you're kin. no numbers exchanged.</p>
+        <button class="scanbtn" onclick="fitkinScan()">📷 scan a code</button></div>
     </div></div>
 
     <div class="card"><h3 style="font-size:17px;margin-bottom:8px">your kin</h3>
@@ -264,7 +285,10 @@ function finish(){
 if(st.done)finish();
 function reset(){localStorage.removeItem("fitkin");location.reload()}
 </script>
+<div id="scanner"><p>point at a kin code</p><video id="scanVid" playsinline></video>
+  <button class="btn ghost" onclick="fitkinScanStop()">cancel</button></div>
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
 <script type="module" src="app.js"></script>
 </body>
 </html>
