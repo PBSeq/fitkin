@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>fitkin</title>
+<meta name="description" content="Find your fitness kin — workout partners matched by neighborhood, schedule, level, and vibe.">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#f2f6f1">
+<style>
+  :root{
+    --bg:#f2f6f1; --card:#ffffff; --ink:#1c2b23; --dim:#66786d;
+    --green:#3c8460; --green-soft:#e2efe6; --green-deep:#265c42;
+    --lime:#d7ecc8; --line:#e3eae2; --r:22px;
+    --shadow:0 6px 24px rgba(38,92,66,.08);
+  }
+  *{margin:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%}
+  body{font-family:-apple-system,'SF Pro Text','Avenir Next',Roboto,sans-serif;
+       background:var(--bg);color:var(--ink);line-height:1.5;
+       display:flex;justify-content:center}
+  #phone{width:100%;max-width:430px;min-height:100dvh;display:flex;flex-direction:column;
+         padding:max(20px,env(safe-area-inset-top)) 20px calc(20px + env(safe-area-inset-bottom))}
+  .screen{display:none;flex-direction:column;flex:1;animation:in .35s ease}
+  .screen.on{display:flex}
+  @keyframes in{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+
+  .logo{font-weight:800;font-size:22px;letter-spacing:-.4px}
+  .logo b{color:var(--green)}
+  h1{font-size:clamp(30px,8vw,38px);font-weight:800;letter-spacing:-1px;line-height:1.15;margin:14px 0 8px}
+  h1 em{font-style:normal;color:var(--green)}
+  .sub{color:var(--dim);font-size:16.5px}
+  .step-tag{display:inline-block;background:var(--lime);color:var(--green-deep);
+            font-size:13px;font-weight:700;border-radius:99px;padding:4px 14px;margin:18px 0 4px}
+
+  .chips{display:flex;flex-wrap:wrap;gap:10px;margin:18px 0}
+  .chip{border:1.5px solid var(--line);background:var(--card);border-radius:99px;
+        padding:11px 18px;font-size:15.5px;font-weight:600;color:var(--ink);
+        cursor:pointer;transition:.15s;user-select:none}
+  .chip.sel{background:var(--green);border-color:var(--green);color:#fff;
+            box-shadow:0 4px 14px rgba(60,132,96,.3)}
+
+  .opt-group{margin:16px 0}
+  .opt-label{font-size:13.5px;font-weight:700;color:var(--dim);text-transform:uppercase;
+             letter-spacing:.6px;margin-bottom:8px}
+  .seg{display:flex;background:var(--card);border:1.5px solid var(--line);
+       border-radius:16px;padding:4px;gap:4px}
+  .seg button{flex:1;border:0;background:none;border-radius:12px;padding:11px 6px;
+              font-size:14.5px;font-weight:650;color:var(--dim);cursor:pointer;transition:.15s}
+  .seg button.sel{background:var(--green-soft);color:var(--green-deep)}
+
+  .grid7{display:grid;grid-template-columns:repeat(7,1fr);gap:7px;margin-top:8px}
+  .day{aspect-ratio:1;border-radius:14px;border:1.5px solid var(--line);background:var(--card);
+       font-size:13px;font-weight:700;color:var(--dim);cursor:pointer;transition:.15s;
+       display:flex;align-items:center;justify-content:center}
+  .day.sel{background:var(--green);border-color:var(--green);color:#fff}
+
+  .cta{margin-top:auto;padding-top:22px}
+  .btn{width:100%;border:0;background:var(--green);color:#fff;font-size:17.5px;font-weight:750;
+       padding:17px;border-radius:99px;cursor:pointer;box-shadow:var(--shadow);transition:.15s}
+  .btn:disabled{opacity:.35;box-shadow:none}
+  .btn.ghost{background:none;color:var(--dim);box-shadow:none;font-weight:600;padding:12px}
+
+  .card{background:var(--card);border-radius:var(--r);padding:20px 22px;box-shadow:var(--shadow);margin:10px 0}
+  .me{display:flex;gap:14px;align-items:center}
+  .ava{width:56px;height:56px;border-radius:50%;background:var(--lime);display:flex;
+       align-items:center;justify-content:center;font-size:26px}
+  .me h3{font-size:18px}
+  .me p{font-size:14px;color:var(--dim)}
+  .tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
+  .tag{background:var(--green-soft);color:var(--green-deep);font-size:13px;font-weight:650;
+       border-radius:99px;padding:4px 12px}
+
+  .pulse{width:120px;height:120px;margin:26px auto 10px;border-radius:50%;
+         background:var(--green-soft);display:flex;align-items:center;justify-content:center;
+         font-size:52px;position:relative}
+  .pulse::after{content:"";position:absolute;inset:-14px;border-radius:50%;
+                border:2px solid var(--green);opacity:.35;animation:pp 2s ease-out infinite}
+  @keyframes pp{from{transform:scale(.8);opacity:.5}to{transform:scale(1.25);opacity:0}}
+  .count{text-align:center}
+  .count b{font-size:34px;letter-spacing:-1px;color:var(--green-deep)}
+  .count p{color:var(--dim);font-size:15px}
+</style>
+</head>
+<body>
+<div id="phone">
+
+  <!-- 0 · Welcome -->
+  <section class="screen on" id="s0">
+    <div class="logo">fit<b>kin</b></div>
+    <div style="margin:auto 0;padding:40px 0">
+      <div style="font-size:64px;margin-bottom:18px">🏃‍♀️🤝🏊‍♂️</div>
+      <h1>Find your <em>fitness kin.</em></h1>
+      <p class="sub">People near you who love to move the way you do —
+      matched by neighborhood, schedule, level, and vibe.</p>
+    </div>
+    <div class="cta">
+      <button class="btn" onclick="go(1)">Get started</button>
+      <button class="btn ghost" onclick="location.href='../'">What is fitkin?</button>
+    </div>
+  </section>
+
+  <!-- 1 · Sports -->
+  <section class="screen" id="s1">
+    <div class="logo">fit<b>kin</b></div>
+    <span class="step-tag">1 of 3 · your sports</span>
+    <h1>What moves you?</h1>
+    <p class="sub">Pick as many as you like.</p>
+    <div class="chips" id="sports"></div>
+    <div class="cta"><button class="btn" id="b1" disabled onclick="go(2)">Next</button></div>
+  </section>
+
+  <!-- 2 · Vibe -->
+  <section class="screen" id="s2">
+    <div class="logo">fit<b>kin</b></div>
+    <span class="step-tag">2 of 3 · your vibe</span>
+    <h1>How do you like to train?</h1>
+    <div class="opt-group"><div class="opt-label">Time of day</div>
+      <div class="seg" data-k="time"><button>🌅 Mornings</button><button>☀️ Daytime</button><button>🌙 Evenings</button></div></div>
+    <div class="opt-group"><div class="opt-label">Energy</div>
+      <div class="seg" data-k="mode"><button>😌 For the joy</button><button>🔥 Competitive</button></div></div>
+    <div class="opt-group"><div class="opt-label">Level</div>
+      <div class="seg" data-k="level"><button>New-ish</button><button>Steady</button><button>Serious</button></div></div>
+    <div class="cta"><button class="btn" id="b2" disabled onclick="go(3)">Next</button></div>
+  </section>
+
+  <!-- 3 · Schedule -->
+  <section class="screen" id="s3">
+    <div class="logo">fit<b>kin</b></div>
+    <span class="step-tag">3 of 3 · your week</span>
+    <h1>When are you free?</h1>
+    <p class="sub">Tap the days you usually can move.</p>
+    <div class="grid7" id="days"></div>
+    <div class="cta"><button class="btn" id="b3" disabled onclick="finish()">See my kin profile</button></div>
+  </section>
+
+  <!-- 4 · Home -->
+  <section class="screen" id="s4">
+    <div class="logo">fit<b>kin</b></div>
+    <div class="card"><div class="me">
+      <div class="ava" id="hAva">🏃</div>
+      <div><h3>Your kin profile</h3><p id="hLine"></p></div>
+    </div><div class="tags" id="hTags"></div></div>
+
+    <div class="card" style="text-align:center">
+      <div class="pulse">📍</div>
+      <div class="count"><b id="hCount"></b>
+        <p>people on the waitlist share your vibe.<br>
+        Matching opens neighborhood by neighborhood —<br>founding members go first.</p></div>
+    </div>
+
+    <div class="cta">
+      <button class="btn" onclick="location.href='https://pathobrain.gumroad.com/l/fitkin'">
+        Claim founding member spot — free</button>
+      <button class="btn ghost" onclick="reset()">Redo my profile</button>
+    </div>
+  </section>
+</div>
+
+<script>
+const SPORTS=[["🏃","Running"],["🏋️","Lifting"],["🎾","Tennis"],["🏊","Swimming"],["🚴","Cycling"],
+  ["🥾","Hiking"],["🧘","Yoga"],["🏀","Basketball"],["⚽","Soccer"],["🏓","Pickleball"],
+  ["🥊","Boxing"],["🧗","Climbing"]];
+const DAYS=["S","M","T","W","T","F","S"];
+const st=JSON.parse(localStorage.getItem("fitkin")||"{}");
+st.sports=st.sports||[]; st.days=st.days||[]; st.vibe=st.vibe||{};
+
+const $=q=>document.querySelector(q);
+function go(n){document.querySelectorAll(".screen").forEach(s=>s.classList.remove("on"));
+  $("#s"+n).classList.add("on");window.scrollTo(0,0);save()}
+function save(){localStorage.setItem("fitkin",JSON.stringify(st))}
+
+// sports chips
+SPORTS.forEach(([e,n])=>{const c=document.createElement("div");c.className="chip";
+  c.textContent=e+" "+n; if(st.sports.includes(n))c.classList.add("sel");
+  c.onclick=()=>{c.classList.toggle("sel");
+    st.sports=st.sports.includes(n)?st.sports.filter(x=>x!==n):[...st.sports,n];
+    $("#b1").disabled=!st.sports.length;save()};
+  $("#sports").appendChild(c)});
+$("#b1").disabled=!st.sports.length;
+
+// vibe segments
+document.querySelectorAll(".seg").forEach(seg=>{const k=seg.dataset.k;
+  [...seg.children].forEach((b,i)=>{ if(st.vibe[k]===b.textContent)b.classList.add("sel");
+    b.onclick=()=>{[...seg.children].forEach(x=>x.classList.remove("sel"));
+      b.classList.add("sel");st.vibe[k]=b.textContent;
+      $("#b2").disabled=!(st.vibe.time&&st.vibe.mode&&st.vibe.level);save()}})});
+$("#b2").disabled=!(st.vibe.time&&st.vibe.mode&&st.vibe.level);
+
+// days
+DAYS.forEach((d,i)=>{const b=document.createElement("button");b.className="day";b.textContent=d;
+  if(st.days.includes(i))b.classList.add("sel");
+  b.onclick=()=>{b.classList.toggle("sel");
+    st.days=st.days.includes(i)?st.days.filter(x=>x!==i):[...st.days,i];
+    $("#b3").disabled=!st.days.length;save()};
+  $("#days").appendChild(b)});
+$("#b3").disabled=!st.days.length;
+
+function finish(){
+  const em=(SPORTS.find(([e,n])=>n===st.sports[0])||["🏃"])[0];
+  $("#hAva").textContent=em;
+  $("#hLine").textContent=[st.vibe.time,st.vibe.mode,st.vibe.level].filter(Boolean).join(" · ");
+  $("#hTags").innerHTML=st.sports.map(s=>`<span class="tag">${s}</span>`).join("")
+    +`<span class="tag">${st.days.length} days/week</span>`;
+  // 정직한 숫자: 실제 대기명단 수를 모르는 클라이언트는 범위를 단정하지 않는다
+  $("#hCount").textContent="You're early";
+  st.done=Date.now();save();go(4)}
+if(st.done)finish();
+function reset(){localStorage.removeItem("fitkin");location.reload()}
+</script>
+</body>
+</html>
