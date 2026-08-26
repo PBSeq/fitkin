@@ -161,3 +161,24 @@ VERDICT: FIX
 ## 2026-08-25 release-gate (Claude 감사자 — Codex 2연속 행업으로 도구 교체)
 5차: 실결함 8건 → 수리 / 6차: 회귀 4건 → 수리 / 7차: 전 흐름 추적 PASS + 노트 2건 반영
 8차: 출장모드 델타 PASS + 논블로킹 1건(전환 실패 토스트) 반영. VERDICT: PASS — 마커 발행.
+
+## 9차 — 소셜 로그인 델타 감사 (2026-08-26, Claude 감사 에이전트)
+
+박사님 지시로 v1.1에 Apple+Google 로그인 추가 후 제출 전 적대 감사.
+
+**[BLOCKER×3, MAJOR×1, MINOR×4] → 전건 수리 → v2 재확인 요청**
+
+| # | 심각도 | 결함 | 처분 |
+|---|--------|------|------|
+| 1 | BLOCKER | 부팅부 무조건 signInAnonymously → 소셜 세션이 재실행마다 익명으로 클로버(킨 증발·중복 카드·삭제 불능 PII) | 복원 유저 없을 때만 익명 로그인 (booted 플래그) |
+| 2 | BLOCKER | privacy.html "do not collect email" vs 로그인 스코프 email 요청 — 5.1.1(i) 정면 충돌 | 수집 고지 추가 + 인앱 삭제 현재형 |
+| 3 | BLOCKER | fitkinDelete가 Auth 계정 미삭제 — 5.1.1(v) 계정 삭제 의무 위반 | deleteUser + signOut 폴백 |
+| 4 | MAJOR | reset→소셜 로그인 시 유령 프로필(주인 없는 실명 카드 영구 노출) | linkWithCredential 우선(UID 보존), already-in-use만 signIn 폴백 |
+| 5 | MINOR | 애플 nonce 미사용(리플레이 방어 부재) | SHA-256 nonce 체인 적용 |
+| 6 | MINOR | SIWA 버튼 HIG 미준수(로고 없음·소문자) | 로고+정확한 표기, G 마크 중립화 |
+| 7 | MINOR | 에러 뭉개기·"next update" 문구·로그인 상태 미표시 | 에러 분기 3종+성공 시 버튼 숨김 |
+| 8 | MINOR | IPA에 죽은 파일(구 app.js 등)·죽은 버튼 | www 정리(bundle.js만)+네이티브 숨김 |
+
+실검증: 신규 설치 익명 온보딩 발행 OK, 재실행 UID 유지·중복 미생성 OK, Apple 로고 렌더 OK, 구글 시트 점화·취소 복귀 OK, SIWA 시트 점화 OK.
+
+교훈(자기개선): "동작하는 데모"와 "생명주기 전체"는 다르다 — 로그인 기능 검증이 시트 점화에서 멈췄다면 세션 클로버는 출하됐다. 인증 델타는 반드시 "재실행·재로그인·삭제" 3생명주기를 감사 항목에 포함할 것.
