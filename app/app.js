@@ -25,9 +25,15 @@ const st = () => JSON.parse(localStorage.getItem("fitkin") || "{}");
 const put = s => localStorage.setItem("fitkin", JSON.stringify(s));
 
 let UID = null;
+// 익명 로그인은 "복원된 유저가 없을 때만". 무조건 호출하면 구글/애플로
+// 로그인한 세션이 재실행 때마다 새 익명 계정으로 갈아엎어진다.
 const authP = new Promise(res => {
-  onAuthStateChanged(auth, u => { if (u) { UID = u.uid; res(u.uid); } });
-  signInAnonymously(auth).catch(() => {});
+  let booted = false;
+  onAuthStateChanged(auth, u => {
+    if (u) { UID = u.uid; res(u.uid); }
+    else if (!booted) signInAnonymously(auth).catch(() => {});
+    booted = true;
+  });
 });
 // 오프라인/인증 실패 시 무한 대기 금지 — 8초 내 미해결이면 null 로 진행
 const ready = Promise.race([authP, new Promise(r => setTimeout(() => r(null), 8000))]);
@@ -40,6 +46,22 @@ const esc = v => String(v ?? "").replace(/[&<>"']/g,
 //    웹은 signInWithPopup. 애플 심사규정 4.8: 구글을 켜면 애플 로그인도 의무.
 const GOOGLE_IOS_CLIENT_ID =
   "125721622489-cvj308ao2l8v2dhopj2rjh1g38crft1f.apps.googleusercontent.com";
+// 익명 세션에 자격증명을 "링크"해 UID 를 보존한다 — 이미 발행한 카드·킨·채팅이
+// 로그인 후에도 그대로 남는다. 그 자격증명이 딴 계정에 묶여 있을 때만 signIn 폴백.
+async function credLogin(c) {
+  await ready;
+  try {
+    if (auth.currentUser && auth.currentUser.isAnonymous) {
+      const { linkWithCredential } =
+        await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js");
+      return await linkWithCredential(auth.currentUser, c);
+    }
+  } catch (e) {
+    if (!String(e.code).includes("credential-already-in-use") &&
+        !String(e.code).includes("provider-already-linked")) throw e;
+  }
+  return signInWithCredential(auth, c);
+}
 window.fitkinLogin = async function (kind) {
   try {
     let cred;
@@ -48,15 +70,24 @@ window.fitkinLogin = async function (kind) {
                window.Capacitor.Plugins && window.Capacitor.Plugins.SocialLogin;
     if (SL) {
       await SL.initialize({ google: { iOSClientId: GOOGLE_IOS_CLIENT_ID }, apple: {} });
-      const r = await SL.login({ provider: kind,
-        options: { scopes: kind === "google" ? ["email", "profile"] : ["email", "name"] } });
+      const opts = { scopes: kind === "google" ? ["email", "profile"] : ["email", "name"] };
+      let rawNonce = null;
+      if (kind === "apple" && window.crypto && crypto.subtle) {
+        // 리플레이 방어: raw nonce 의 SHA-256 을 애플에, raw 를 Firebase 에.
+        rawNonce = Array.from(crypto.getRandomValues(new Uint8Array(16)),
+          b => b.toString(16).padStart(2, "0")).join("");
+        const d = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(rawNonce));
+        opts.nonce = Array.from(new Uint8Array(d),
+          b => b.toString(16).padStart(2, "0")).join("");
+      }
+      const r = await SL.login({ provider: kind, options: opts });
       const idToken = r && r.result && r.result.idToken;
       if (!idToken) throw Object.assign(new Error("no idToken"), { code: "popup-closed" });
       const c = kind === "apple"
         ? new OAuthProvider("apple.com").credential(
-            r.result.nonce ? { idToken, rawNonce: r.result.nonce } : { idToken })
+            rawNonce ? { idToken, rawNonce } : { idToken })
         : GoogleAuthProvider.credential(idToken);
-      cred = await signInWithCredential(auth, c);
+      cred = await credLogin(c);
     } else {
       const { signInWithPopup } =
         await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js");
@@ -65,12 +96,16 @@ window.fitkinLogin = async function (kind) {
     }
     const s = st(); s.loginName = cred.user.displayName || ""; put(s);
     toast("signed in" + (s.loginName ? " as " + s.loginName.split(" ")[0] : "") + " ✓");
+    const row = $("#loginRow"); if (row) row.style.display = "none";
     const nameEl = $("#fName");
     if (nameEl && !nameEl.value && s.loginName) { nameEl.value = s.loginName.split(" ")[0]; nameEl.dispatchEvent(new Event("input")); }
   } catch (e) {
-    if (String(e.code).includes("operation-not-allowed"))
-      toast("login opens with the next update — continue as guest");
-    else if (!String(e.code).includes("popup-closed")) toast("login hiccup — guest mode works fine");
+    if (String(e.code).includes("account-exists-with-different-credential"))
+      toast("that email is already tied to your other sign-in — try the other button");
+    else if (String(e.code).includes("operation-not-allowed"))
+      toast("sign-in isn't available right now — guest mode works fine");
+    else if (!String(e.code).includes("popup-closed") && !String(e.code).includes("canceled"))
+      toast("login hiccup — guest mode works fine");
   }
 };
 
@@ -406,12 +441,20 @@ window.fitkinAreaHome = async function () {
 
 // ── 프로필 완전 삭제 (privacy 약속 이행: 서버 데이터까지 지운다) ──
 window.fitkinDelete = async function () {
-  if (!confirm("delete your profile everywhere? this removes your card from fitkin's servers and this phone.")) return;
+  if (!confirm("delete your account everywhere? this removes your card and your sign-in from fitkin's servers and this phone.")) return;
   try {
     await ready;
     if (UID) {
       const { deleteDoc } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
       await deleteDoc(doc(db, "profiles", UID));
+    }
+    // 계정 삭제 의무(심사 5.1.1(v)): 프로필 문서만이 아니라 Auth 계정(이메일 포함)까지.
+    // requires-recent-login 이면 문서는 이미 지워졌으므로 로그아웃으로 마무리한다.
+    if (auth.currentUser) {
+      const { deleteUser, signOut } =
+        await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js");
+      try { await deleteUser(auth.currentUser); }
+      catch (e2) { try { await signOut(auth); } catch (e3) {} }
     }
     localStorage.removeItem("fitkin");
     toast("deleted. take care out there 💚");

@@ -125,8 +125,9 @@
   .lbtn{background:var(--card);border:1.5px solid var(--line);color:var(--ink);white-space:nowrap;
         font-family:inherit;font-size:15px;font-weight:700;border-radius:99px;padding:13px;cursor:pointer}
   .lbtn:active{transform:scale(.97)}
-  .gmark{display:inline-block;background:var(--volt);color:#0c120e;border-radius:6px;
+  .gmark{display:inline-block;background:#fff;color:#1f1f1f;border-radius:50%;
          width:20px;height:20px;line-height:20px;text-align:center;font-weight:800;font-size:13px}
+  .amark{font-family:-apple-system,'SF Pro Text',system-ui;font-size:17px;line-height:1;vertical-align:-1px;margin-right:2px}
   #scanner{position:fixed;inset:0;background:#000c;backdrop-filter:blur(6px);z-index:50;
            display:none;flex-direction:column;align-items:center;justify-content:center;gap:18px}
   #scanner.on{display:flex}
@@ -173,14 +174,14 @@
     <div class="cta">
       <button class="btn" onclick="go(1)">let's go</button>
       <div class="loginrow" id="loginRow">
-        <button class="lbtn" onclick="fitkinLogin('apple')"> continue with apple</button>
-        <button class="lbtn" onclick="fitkinLogin('google')"><span class="gmark">G</span> continue with google</button>
+        <button class="lbtn" onclick="fitkinLogin('apple')"><span class="amark">&#xF8FF;</span> Continue with Apple</button>
+        <button class="lbtn" onclick="fitkinLogin('google')"><span class="gmark">G</span> Continue with Google</button>
       </div>
       <script>/* v1.1: 네이티브에서 애플+구글 로그인 점화 (심사규정 4.8 충족 — 애플 로그인 동시 제공).
-      네이티브에선 외부 웨이트리스트 CTA 만 숨긴다 (외부 링크 최소화 — 심사 마찰 제거) */
+      네이티브에선 외부 웨이트리스트 CTA 와 사이트 이동 버튼을 숨긴다 (외부 링크 최소화 — 심사 마찰 제거) */
       if(window.Capacitor||navigator.userAgent.includes('fitkin-ios')){
         addEventListener('DOMContentLoaded',()=>document.querySelectorAll('.btn').forEach(b=>{
-          if(b.textContent.includes('founding spot'))b.style.display='none'}));
+          if(b.textContent.includes('founding spot')||b.textContent.includes('what is fitkin'))b.style.display='none'}));
       }</script>
       <button class="btn ghost" onclick="location.href='../'">what is fitkin?</button>
     </div>
