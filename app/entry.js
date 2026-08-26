@@ -3,10 +3,11 @@
 // "근처" = ZIP 앞 3자리(우편 권역) 일치 — 지도 데이터 $0.
 import { initializeApp } from "firebase/app";
 import { initializeAuth, indexedDBLocalPersistence, browserLocalPersistence,
-         browserPopupRedirectResolver, signInAnonymously, onAuthStateChanged, signInWithPopup, GoogleAuthProvider, OAuthProvider }
+         browserPopupRedirectResolver, signInAnonymously, onAuthStateChanged,
+         signInWithCredential, GoogleAuthProvider, OAuthProvider, signInWithPopup }
   from "firebase/auth";
 import { getFirestore, collection, doc, setDoc, getDoc, getDocs, query, where,
-         orderBy, limit, limitToLast, addDoc, onSnapshot, deleteDoc }
+         orderBy, limit, limitToLast, addDoc, onSnapshot }
   from "firebase/firestore";
 
 const app = initializeApp({
@@ -35,11 +36,31 @@ const ready = Promise.race([authP, new Promise(r => setTimeout(() => r(null), 80
 const esc = v => String(v ?? "").replace(/[&<>"']/g,
   c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
-// ── 소셜 로그인 (웹 전용 — 네이티브는 1.1에서 숨김 유지) ──
+// ── 소셜 로그인 — 네이티브(iOS)는 SocialLogin 플러그인→signInWithCredential,
+//    웹은 signInWithPopup. 애플 심사규정 4.8: 구글을 켜면 애플 로그인도 의무.
+const GOOGLE_IOS_CLIENT_ID =
+  "125721622489-cvj308ao2l8v2dhopj2rjh1g38crft1f.apps.googleusercontent.com";
 window.fitkinLogin = async function (kind) {
   try {
-    const provider = kind === "apple" ? new OAuthProvider("apple.com") : new GoogleAuthProvider();
-    const cred = await signInWithPopup(auth, provider, browserPopupRedirectResolver);
+    let cred;
+    const SL = window.Capacitor && window.Capacitor.isNativePlatform &&
+               window.Capacitor.isNativePlatform() &&
+               window.Capacitor.Plugins && window.Capacitor.Plugins.SocialLogin;
+    if (SL) {
+      await SL.initialize({ google: { iOSClientId: GOOGLE_IOS_CLIENT_ID }, apple: {} });
+      const r = await SL.login({ provider: kind,
+        options: { scopes: kind === "google" ? ["email", "profile"] : ["email", "name"] } });
+      const idToken = r && r.result && r.result.idToken;
+      if (!idToken) throw Object.assign(new Error("no idToken"), { code: "popup-closed" });
+      const c = kind === "apple"
+        ? new OAuthProvider("apple.com").credential(
+            r.result.nonce ? { idToken, rawNonce: r.result.nonce } : { idToken })
+        : GoogleAuthProvider.credential(idToken);
+      cred = await signInWithCredential(auth, c);
+    } else {
+      const provider = kind === "apple" ? new OAuthProvider("apple.com") : new GoogleAuthProvider();
+      cred = await signInWithPopup(auth, provider, browserPopupRedirectResolver);
+    }
     const s = st(); s.loginName = cred.user.displayName || ""; put(s);
     toast("signed in" + (s.loginName ? " as " + s.loginName.split(" ")[0] : "") + " ✓");
     const nameEl = $("#fName");
@@ -387,7 +408,7 @@ window.fitkinDelete = async function () {
   try {
     await ready;
     if (UID) {
-      await deleteDoc(doc(db, "profiles", UID));
+            await deleteDoc(doc(db, "profiles", UID));
     }
     localStorage.removeItem("fitkin");
     toast("deleted. take care out there 💚");
