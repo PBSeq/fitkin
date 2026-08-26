@@ -1,0 +1,25 @@
+{
+  "name": "fitkin-site",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/PBSeq/fitkin.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/PBSeq/fitkin/issues"
+  },
+  "homepage": "https://github.com/PBSeq/fitkin#readme",
+  "dependencies": {
+    "esbuild": "^0.28.2",
+    "firebase": "^12.18.0"
+  }
+}
