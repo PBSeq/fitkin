@@ -2,7 +2,8 @@
 // 프라이버시 원칙 유지: GPS 없음. 이용자가 적는 5자리 ZIP 만.
 // "근처" = ZIP 앞 3자리(우편 권역) 일치 — 지도 데이터 $0.
 import { initializeApp } from "firebase/app";
-import { getAuth, signInAnonymously, onAuthStateChanged, signInWithPopup, GoogleAuthProvider, OAuthProvider }
+import { initializeAuth, indexedDBLocalPersistence, browserLocalPersistence,
+         browserPopupRedirectResolver, signInAnonymously, onAuthStateChanged, signInWithPopup, GoogleAuthProvider, OAuthProvider }
   from "firebase/auth";
 import { getFirestore, collection, doc, setDoc, getDoc, getDocs, query, where,
          orderBy, limit, limitToLast, addDoc, onSnapshot, deleteDoc }
@@ -15,7 +16,9 @@ const app = initializeApp({
   authDomain: "fitkin-buddy.firebaseapp.com",
 });
 const db = getFirestore(app);
-const auth = getAuth(app);
+// Capacitor WKWebView 에서 getAuth() 기본 리졸버가 굳는다 — 리졸버 없이 초기화(공식 패턴).
+// 팝업 로그인은 호출 시에만 리졸버를 명시적으로 넘긴다.
+const auth = initializeAuth(app, { persistence: [indexedDBLocalPersistence, browserLocalPersistence] });
 const $ = q => document.querySelector(q);
 const st = () => JSON.parse(localStorage.getItem("fitkin") || "{}");
 const put = s => localStorage.setItem("fitkin", JSON.stringify(s));
@@ -36,7 +39,7 @@ const esc = v => String(v ?? "").replace(/[&<>"']/g,
 window.fitkinLogin = async function (kind) {
   try {
     const provider = kind === "apple" ? new OAuthProvider("apple.com") : new GoogleAuthProvider();
-    const cred = await signInWithPopup(auth, provider);
+    const cred = await signInWithPopup(auth, provider, browserPopupRedirectResolver);
     const s = st(); s.loginName = cred.user.displayName || ""; put(s);
     toast("signed in" + (s.loginName ? " as " + s.loginName.split(" ")[0] : "") + " ✓");
     const nameEl = $("#fName");
