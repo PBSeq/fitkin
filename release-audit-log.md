@@ -182,3 +182,11 @@ VERDICT: FIX
 실검증: 신규 설치 익명 온보딩 발행 OK, 재실행 UID 유지·중복 미생성 OK, Apple 로고 렌더 OK, 구글 시트 점화·취소 복귀 OK, SIWA 시트 점화 OK.
 
 교훈(자기개선): "동작하는 데모"와 "생명주기 전체"는 다르다 — 로그인 기능 검증이 시트 점화에서 멈췄다면 세션 클로버는 출하됐다. 인증 델타는 반드시 "재실행·재로그인·삭제" 3생명주기를 감사 항목에 포함할 것.
+
+### 9차 후속 — PASS v2 → v1.1(빌드5) 재제출 완료 (2026-08-26)
+
+- 감사 v2: 8건 수리 전부 소스·번들·배포 사본 3중 대조 PASS, 차단급 회귀 없음
+- 제출 경로: 아카이브(1.1/5, 자동서명+SIWA capability) → IPA export → altool 업로드 → VALID → 빌드 연결 + 암호화 비해당 → reviewSubmissions **WAITING_FOR_REVIEW**
+- 제출 중 발견·해결: iPad 스크린샷 필수(APP_IPAD_PRO_3GEN_129) → iPad Air 13" 시뮬레이터로 3장 촬영(2048x2732, 밝기 게이트 통과)·업로드 후 제출 성공
+- 잔여(비차단, v1.2 백로그): 링크 로그인 displayName 폴백 / deleteUser 재인증 재시도 / 웹 linkWithPopup / privacy 용어 통일
+- 인간 확인 필요: ASC App Privacy 라벨에 이름·이메일 추가 (API 미지원 — 박사님)
