@@ -55,6 +55,7 @@ service cloud.firestore {
                       || request.auth.uid == resource.data.a
                       || request.auth.uid == resource.data.b);
       allow create: if request.auth != null
+                    && notBanned()
                     && request.resource.data.keys().hasOnly(['a','b','ts'])
                     && (request.auth.uid == request.resource.data.a
                         || request.auth.uid == request.resource.data.b)

@@ -126,7 +126,9 @@ window.fitkinLogin = async function (kind) {
         if (snap.exists()) {
           const d = snap.data();
           put({ ...st(), id: cred.user.uid, name: d.name, sports: d.sports, vibe: d.vibe,
-                days: d.days, zip: d.zip, done: 1, published: Date.now() });
+                days: d.days, zip: d.zip, done: 1, published: Date.now(),
+                ...(typeof d.photo === "string" && d.photo.startsWith("data:image/jpeg;base64,")
+                    ? { photoData: d.photo } : {}) });
           toast("welcome back, " + d.name + " ✓");
           // 홈 카드 헤더는 인라인 renderCard 만 그릴 수 있다 — 리로드로 전체 재부팅
           setTimeout(() => location.reload(), 900);
@@ -752,40 +754,55 @@ window.fitkinAreaHome = async function () {
 
 // ── 프로필 완전 삭제 (privacy 약속 이행: 서버 데이터까지 지운다) ──
 window.fitkinDelete = async function () {
-  if (!confirm("delete your account everywhere? this removes your card and your sign-in from fitkin's servers and this phone.")) return;
+  if (!confirm("delete your account everywhere? this removes your card, your photos, and your sign-in from fitkin's servers and this phone.")) return;
   try {
     await ready;
     // 오프라인이면 삭제를 가장하지 않는다 — 서버까지 지울 수 있을 때만 "deleted"
     if (!UID) { toast("you're offline — try deleting again when you're back online"); return; }
-    if (UID) {
-      const { deleteDoc } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
-      await deleteDoc(doc(db, "profiles", UID));
-    }
-    // 계정 삭제 의무(심사 5.1.1(v)): 프로필 문서만이 아니라 Auth 계정(이메일 포함)까지.
-    // 오래된 세션이면(requires-recent-login) 그 자리에서 재인증받아 재시도 —
-    // "deleted" 라고 말했으면 서버에도 정말 없어야 한다.
-    if (auth.currentUser) {
-      const { deleteUser, signOut, reauthenticateWithCredential } =
+    const { deleteDoc } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
+    // 내 모먼트 사진부터 — Auth 를 지운 뒤엔 본인도 못 지우게 되므로 순서가 중요하다
+    try {
+      const mine = await getDocs(query(collection(db, "photos"),
+        where("owner", "==", UID), limit(100)));
+      for (const d of mine.docs) await deleteDoc(d.ref);
+    } catch (ep) {}
+    await deleteDoc(doc(db, "profiles", UID));
+    // 계정 삭제 의무(심사 5.1.1(v)): Auth 계정(이메일 포함)까지. 오래된 세션이면
+    // 그 자리에서 재인증(네이티브 시트/웹 팝업) 후 재시도. 실패하면 성공을 가장하지
+    // 않고 정직하게 남은 단계를 알린다.
+    let authDeleted = true;
+    if (auth.currentUser && !auth.currentUser.isAnonymous) {
+      const { deleteUser, signOut, reauthenticateWithCredential, reauthenticateWithPopup } =
         await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js");
       try { await deleteUser(auth.currentUser); }
       catch (e2) {
-        let done = false;
-        if (String(e2.code).includes("requires-recent-login") && nativeSL()) {
+        authDeleted = false;
+        if (String(e2.code).includes("requires-recent-login")) {
           try {
-            // reauthenticate 는 다른 계정을 고르면 user-mismatch 로 거부한다 — 오삭제 봉인
             const prov = ((auth.currentUser.providerData || [])[0] || {}).providerId || "";
-            await reauthenticateWithCredential(auth.currentUser,
-              await nativeCred(prov.includes("apple") ? "apple" : "google"));
+            const kind = prov.includes("apple") ? "apple" : "google";
+            if (nativeSL()) {
+              // reauthenticate 는 다른 계정을 고르면 user-mismatch 로 거부한다 — 오삭제 봉인
+              await reauthenticateWithCredential(auth.currentUser, await nativeCred(kind));
+            } else {
+              const provider = kind === "apple" ? new OAuthProvider("apple.com") : new GoogleAuthProvider();
+              await reauthenticateWithPopup(auth.currentUser, provider, browserPopupRedirectResolver);
+            }
             await deleteUser(auth.currentUser);
-            done = true;
+            authDeleted = true;
           } catch (e4) {}
         }
-        if (!done) { try { await signOut(auth); } catch (e3) {} }
+        if (!authDeleted) { try { await signOut(auth); } catch (e3) {} }
       }
+    } else if (auth.currentUser) {
+      const { deleteUser } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js");
+      try { await deleteUser(auth.currentUser); } catch (e5) {}
     }
     localStorage.removeItem("fitkin");
-    toast("deleted. take care out there 💚");
-    setTimeout(() => location.reload(), 1200);
+    toast(authDeleted
+      ? "deleted. take care out there 💚"
+      : "your card and photos are deleted. to finish removing your sign-in, sign in once more and delete again.");
+    setTimeout(() => location.reload(), authDeleted ? 1200 : 3200);
   } catch (e) { toast("couldn't reach the server — try again online"); }
 };
 
