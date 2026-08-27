@@ -194,6 +194,11 @@
       </div>
       <script>/* v1.1: 네이티브에서 애플+구글 로그인 점화 (심사규정 4.8 충족 — 애플 로그인 동시 제공).
       네이티브에선 외부 웨이트리스트 CTA 와 사이트 이동 버튼을 숨긴다 (외부 링크 최소화 — 심사 마찰 제거) */
+      if(window.Capacitor&&window.Capacitor.getPlatform&&window.Capacitor.getPlatform()==='android'){
+        /* 안드로이드: 애플 로그인 의무 없음 + 애플 글리프 미지원 — 애플 버튼 숨김 */
+        addEventListener('DOMContentLoaded',()=>document.querySelectorAll('.lbtn').forEach(b=>{
+          if(b.textContent.includes('Apple'))b.style.display='none'}));
+      }
       if(window.Capacitor||navigator.userAgent.includes('fitkin-ios')){
         addEventListener('DOMContentLoaded',()=>document.querySelectorAll('.btn').forEach(b=>{
           if(b.textContent.includes('founding spot')||b.textContent.includes('what is fitkin'))b.style.display='none'}));
