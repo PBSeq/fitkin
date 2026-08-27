@@ -127,6 +127,22 @@ service cloud.firestore {
       allow update: if false;
     }
 
+    // 피드백/컴플레인 창구: 누구나(인증 사용자) 제출, 열람·대응은 운영자만.
+    match /feedback/{id} {
+      allow create: if request.auth != null
+                    && request.resource.data.keys().hasOnly(['by','text','contact','app','ts'])
+                    && request.resource.data.by == request.auth.uid
+                    && request.resource.data.text is string
+                    && request.resource.data.text.size() >= 1
+                    && request.resource.data.text.size() <= 1000
+                    && request.resource.data.contact is string
+                    && request.resource.data.contact.size() <= 100
+                    && request.resource.data.app is string
+                    && request.resource.data.app.size() <= 10
+                    && request.resource.data.ts is number;
+      allow read, update, delete: if false;
+    }
+
     // 신고: 인앱 제출(본인 명의만). 열람은 운영자(관리 토큰)만 — 클라이언트 read 금지.
     match /reports/{id} {
       allow create: if request.auth != null

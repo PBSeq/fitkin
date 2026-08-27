@@ -813,6 +813,22 @@ window.fitkinDelete = async function () {
   } catch (e) { toast("couldn't reach the server — try again online"); }
 };
 
+// 컴플레인·피드백 창구 — 서버 접수함(feedback)으로 직행, 운영자(자비스)가 매일 검토.
+window.fitkinFeedback = async function () {
+  const text = (prompt("what's going on? bugs, complaints, ideas — we read every message.") || "").trim().slice(0, 1000);
+  if (!text) return;
+  const contact = (prompt("want a reply? leave an email (optional)") || "").trim().slice(0, 100);
+  try {
+    await ready;
+    if (!UID) { toast("you're offline — try again when you're back"); return; }
+    await addDoc(collection(db, "feedback"), {
+      by: UID, text, contact,
+      app: (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) ? "ios" : "web",
+      ts: Date.now(),
+    });
+    toast("got it — thank you 💚 we read every message");
+  } catch (e) { toast("couldn't send — try again in a moment"); }
+};
 window.fitkinHome = paintHome;
 // 인라인 renderCard 는 번들보다 먼저 실행돼 SVG 아바타를 모른다 — 로드 직후 한 번 재도색
 try { if (window.renderCard && st().done) window.renderCard(); } catch (e) {}
