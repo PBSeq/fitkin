@@ -233,3 +233,11 @@ Codex 3차: 수리 5건 전원 OK, 전 파일 재스윕 신규 결함 0건 → *
 - Android v1.1 AAB 서명 빌드·에뮬레이터 실검증(웰컴·온보딩·홈·피드 관통, Android는 Apple 로그인 버튼 숨김)
 - Codex 콜드리뷰 1차 FIX-FIRST(아이콘 빈약·피처그래픽 타이포·스크린샷 2장+상태바 클러터) → 전면 재작업(iOS 아이콘 통일, 데모 상태바, 실 UI 4장) → **재검수 SHIP**
 - 업로드 자동화: play-publisher 서비스 계정+키 발급. Play Console 초대만 수동 대기(구글이 초대 화면 자동화 차단 — 박사님 1분 작업)
+
+## 13차 — Google Play v1.1 제출 진행 (2026-08-27 새벽)
+
+- 설정 11/11 완료 (Data safety·Health는 박사님 수동 — 구글이 해당 폼 자동화 차단)
+- 국가: **미국만** (박사님 승인 — ZIP 기반 제품 정합, v1.2 글로벌 그리드 후 확장)
+- 사전 검사 이슈: "Incomplete advertising ID declaration" → 실원인은 **Firebase 라이브러리가 주입한 AD_ID·ADSERVICES 권한 5종** + 웹 Save가 v1을 completed로 박아버림 → 매니페스트 tools:node="remove" 5종 + versionCode 3 클린 빌드로 트랙 대체 커밋 성공
+- 현재: 사전 검사 통과 시 자동 심사 발송 대기
+- 교훈: **선언과 바이너리는 함께 검증된다** — "광고 안 씀"이라 말하려면 라이브러리가 몰래 넣은 권한까지 지워야 한다. 그리고 Play 웹 UI의 Save는 draft를 completed로 승격시킬 수 있다 — API 트랙 상태를 커밋 전에 GET으로 확인할 것
