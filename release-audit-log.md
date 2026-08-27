@@ -190,3 +190,16 @@ VERDICT: FIX
 - 제출 중 발견·해결: iPad 스크린샷 필수(APP_IPAD_PRO_3GEN_129) → iPad Air 13" 시뮬레이터로 3장 촬영(2048x2732, 밝기 게이트 통과)·업로드 후 제출 성공
 - 잔여(비차단, v1.2 백로그): 링크 로그인 displayName 폴백 / deleteUser 재인증 재시도 / 웹 linkWithPopup / privacy 용어 통일
 - 인간 확인 필요: ASC App Privacy 라벨에 이름·이메일 추가 (API 미지원 — 박사님)
+
+### 10차 — 박사님 실기기 콜드테스트에서 결함 2건 → 빌드6 교체 제출 (2026-08-26)
+
+박사님이 iPhone 11 실기기로 전 기능 테스트 (채팅·스캔·카메라·삭제 정상 확인).
+
+| 결함 | 원인 | 처분 |
+|------|------|------|
+| share my link 무반응 | WKWebView에서 navigator.share 실패 + catch(e){} 무음 삼킴 | Capacitor Share 플러그인 + 4단 폴백 체인(시트→share API→클립보드→prompt) |
+| 공유·QR 링크가 capacitor://localhost | kinUrl이 location 기반 | 네이티브에선 정식 웹 주소(pbseq.github.io) 고정, 스캐너는 #kin= 패턴이라 호환 |
+
+처리: 제출(빌드5) 취소 → 빌드6 아카이브·업로드·VALID → 재제출 WAITING_FOR_REVIEW (894fc02c). 실기기·시뮬레이터에서 공유 시트+정상 링크 검증 완료. 웹에도 동일 수리 배포.
+
+교훈: **에러를 삼키는 catch는 "무반응 버튼"을 출하한다** — 모든 사용자 액션은 실패해도 다음 폴백이나 정직한 토스트로 끝나야 한다. 그리고 시뮬레이터 검증으로 못 잡는 것(공유 시트, 실 URL)은 실기기 콜드테스트가 잡는다 — 제출 전 실기기 1회 주행을 게이트에 추가.
