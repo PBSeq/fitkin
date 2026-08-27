@@ -2,7 +2,7 @@
 // 프라이버시 원칙 유지: GPS 없음. 이용자가 적는 5자리 ZIP 만.
 // "근처" = ZIP 앞 3자리(우편 권역) 일치 — 지도 데이터 $0.
 import { initializeApp } from "firebase/app";
-import { initializeAuth, indexedDBLocalPersistence, browserLocalPersistence, browserPopupRedirectResolver, signInAnonymously, onAuthStateChanged, signInWithCredential, GoogleAuthProvider, OAuthProvider, deleteUser, linkWithCredential, signInWithPopup, signOut }
+import { initializeAuth, indexedDBLocalPersistence, browserLocalPersistence, browserPopupRedirectResolver, signInAnonymously, onAuthStateChanged, signInWithCredential, GoogleAuthProvider, OAuthProvider, deleteUser, linkWithCredential, linkWithPopup, reauthenticateWithCredential, signInWithPopup, signOut }
   from "firebase/auth";
 import { getFirestore, collection, doc, setDoc, getDoc, getDocs, query, where, orderBy, limit, limitToLast, addDoc, onSnapshot, deleteDoc }
   from "firebase/firestore";
@@ -57,41 +57,85 @@ async function credLogin(c) {
   }
   return signInWithCredential(auth, c);
 }
+function nativeSL() {
+  return window.Capacitor && window.Capacitor.isNativePlatform &&
+         window.Capacitor.isNativePlatform() &&
+         window.Capacitor.Plugins && window.Capacitor.Plugins.SocialLogin;
+}
+// 네이티브 로그인 시트를 띄워 Firebase 자격증명을 만든다 (로그인·재인증 공용)
+async function nativeCred(kind) {
+  const SL = nativeSL();
+  await SL.initialize({ google: { iOSClientId: GOOGLE_IOS_CLIENT_ID }, apple: {} });
+  const opts = { scopes: kind === "google" ? ["email", "profile"] : ["email", "name"] };
+  let rawNonce = null;
+  if (kind === "apple" && window.crypto && crypto.subtle) {
+    // 리플레이 방어: raw nonce 의 SHA-256 을 애플에, raw 를 Firebase 에.
+    rawNonce = Array.from(crypto.getRandomValues(new Uint8Array(16)),
+      b => b.toString(16).padStart(2, "0")).join("");
+    const d = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(rawNonce));
+    opts.nonce = Array.from(new Uint8Array(d),
+      b => b.toString(16).padStart(2, "0")).join("");
+  }
+  const r = await SL.login({ provider: kind, options: opts });
+  const idToken = r && r.result && r.result.idToken;
+  if (!idToken) throw Object.assign(new Error("no idToken"), { code: "popup-closed" });
+  return kind === "apple"
+    ? new OAuthProvider("apple.com").credential(
+        rawNonce ? { idToken, rawNonce } : { idToken })
+    : GoogleAuthProvider.credential(idToken);
+}
 window.fitkinLogin = async function (kind) {
   try {
     let cred;
-    const SL = window.Capacitor && window.Capacitor.isNativePlatform &&
-               window.Capacitor.isNativePlatform() &&
-               window.Capacitor.Plugins && window.Capacitor.Plugins.SocialLogin;
-    if (SL) {
-      await SL.initialize({ google: { iOSClientId: GOOGLE_IOS_CLIENT_ID }, apple: {} });
-      const opts = { scopes: kind === "google" ? ["email", "profile"] : ["email", "name"] };
-      let rawNonce = null;
-      if (kind === "apple" && window.crypto && crypto.subtle) {
-        // 리플레이 방어: raw nonce 의 SHA-256 을 애플에, raw 를 Firebase 에.
-        rawNonce = Array.from(crypto.getRandomValues(new Uint8Array(16)),
-          b => b.toString(16).padStart(2, "0")).join("");
-        const d = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(rawNonce));
-        opts.nonce = Array.from(new Uint8Array(d),
-          b => b.toString(16).padStart(2, "0")).join("");
-      }
-      const r = await SL.login({ provider: kind, options: opts });
-      const idToken = r && r.result && r.result.idToken;
-      if (!idToken) throw Object.assign(new Error("no idToken"), { code: "popup-closed" });
-      const c = kind === "apple"
-        ? new OAuthProvider("apple.com").credential(
-            rawNonce ? { idToken, rawNonce } : { idToken })
-        : GoogleAuthProvider.credential(idToken);
-      cred = await credLogin(c);
+    if (nativeSL()) {
+      cred = await credLogin(await nativeCred(kind));
     } else {
             const provider = kind === "apple" ? new OAuthProvider("apple.com") : new GoogleAuthProvider();
-      cred = await signInWithPopup(auth, provider, browserPopupRedirectResolver);
+      // 웹도 네이티브와 동일하게: 익명 세션에 링크(UID 보존), 기존 계정이면 signIn 폴백
+      await ready;
+      try {
+        if (auth.currentUser && auth.currentUser.isAnonymous)
+          cred = await linkWithPopup(auth.currentUser, provider, browserPopupRedirectResolver);
+      } catch (e) {
+        if (!String(e.code).includes("credential-already-in-use") &&
+            !String(e.code).includes("provider-already-linked")) throw e;
+      }
+      if (!cred) cred = await signInWithPopup(auth, provider, browserPopupRedirectResolver);
     }
-    const s = st(); s.loginName = cred.user.displayName || ""; put(s);
+    const s = st();
+    // 링크 로그인은 top-level displayName 이 비어 있다 — providerData 에서 폴백
+    s.loginName = cred.user.displayName ||
+      (((cred.user.providerData || []).find(p => p && p.displayName) || {}).displayName) || "";
+    put(s);
+    UID = cred.user.uid;
+    // 이 계정으로 만든 카드가 서버에 있으면 그대로 복원 — 재설치·재로그인 관통.
+    // 로컬 카드의 주인(s.id)과 로그인 계정이 다르면(기존 계정으로 signIn 폴백된 경우)에도
+    // 서버 카드를 우선 복원하고, 서버에 없으면 로컬 카드를 새 계정에 이식한다.
+    const s2 = st();
+    const mismatch = !!(s2.id && s2.id !== cred.user.uid);
+    if (!s2.done || mismatch) {
+      try {
+        const snap = await getDoc(doc(db, "profiles", cred.user.uid));
+        if (snap.exists()) {
+          const d = snap.data();
+          put({ ...st(), id: cred.user.uid, name: d.name, sports: d.sports, vibe: d.vibe,
+                days: d.days, zip: d.zip, done: 1, published: Date.now() });
+          toast("welcome back, " + d.name + " ✓");
+          // 홈 카드 헤더는 인라인 renderCard 만 그릴 수 있다 — 리로드로 전체 재부팅
+          setTimeout(() => location.reload(), 900);
+          return;
+        }
+      } catch (e) {}
+      if (mismatch && s2.done) {
+        s2.id = cred.user.uid; s2.published = 0; put(s2);
+        window.fitkinPublish();
+      }
+    }
     toast("signed in" + (s.loginName ? " as " + s.loginName.split(" ")[0] : "") + " ✓");
     const row = $("#loginRow"); if (row) row.style.display = "none";
     const nameEl = $("#fName");
     if (nameEl && !nameEl.value && s.loginName) { nameEl.value = s.loginName.split(" ")[0]; nameEl.dispatchEvent(new Event("input")); }
+    paintAcct();
   } catch (e) {
     if (String(e.code).includes("account-exists-with-different-credential"))
       toast("that email is already tied to your other sign-in — try the other button");
@@ -101,6 +145,31 @@ window.fitkinLogin = async function (kind) {
       toast("login hiccup — guest mode works fine");
   }
 };
+// 로그아웃: 카드·킨은 서버에 남는다. 재로그인하면 그대로 복원.
+window.fitkinSignOut = async function () {
+  if (!confirm("sign out? your card and kin stay safe — sign back in anytime to get them back.")) return;
+  try {
+        await signOut(auth);
+  } catch (e) {}
+  localStorage.removeItem("fitkin");
+  location.reload();
+};
+// 홈 하단 계정 행: 게스트에겐 로그인 진입점, 로그인 유저에겐 로그아웃
+function paintAcct() {
+  const el = $("#acctRow"); if (!el) return;
+  const u = auth.currentUser;
+  if (u && !u.isAnonymous) {
+    const nm = (st().loginName ||
+      (((u.providerData || []).find(p => p && p.displayName) || {}).displayName) ||
+      u.email || "you").split(" ")[0];
+    el.innerHTML = `signed in as <b style="color:var(--mint)">${esc(nm)}</b> ·
+      <a href="#" onclick="fitkinSignOut();return false" style="color:var(--mint)">sign out</a>`;
+  } else {
+    el.innerHTML = `guest mode — sign in to keep your card:
+      <a href="#" onclick="fitkinLogin('apple');return false" style="color:var(--mint)">apple</a> ·
+      <a href="#" onclick="fitkinLogin('google');return false" style="color:var(--mint)">google</a>`;
+  }
+}
 
 // ── 프로필 발행 (uid 문서 — 본인만 쓰기, redo 는 같은 문서 갱신) ──
 // UID 없이는 절대 쓰지 않는다 (profiles/null 방지). auth 회복 시 자동 재시도.
@@ -115,10 +184,12 @@ window.fitkinPublish = async function () {
   }
   try {
     s.id = UID; put(s);
-    await setDoc(doc(db, "profiles", UID), {
+    const payload = {
       name: s.name.slice(0, 30), sports: s.sports, vibe: s.vibe, days: s.days,
       zip: s.zip, ts: Date.now(),
-    });
+    };
+    if (s.photoData) payload.photo = s.photoData;
+    await setDoc(doc(db, "profiles", UID), payload);
     s.published = Date.now(); put(s);
     paintHome();
     return true;
@@ -171,13 +242,26 @@ async function discover() {
   return { hood: take(qz, false), near: take(qn, true) };
 }
 
+// 이름 시드 그라데이션 + 이니셜 아바타 — 이모지 대신 프로덕트급 기본 아바타.
+// 같은 이름이면 항상 같은 색(결정적). 사진이 오면 사진이 이긴다.
+function avatarSvg(name, size) {
+  let h = 0; for (const ch of String(name || "?")) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  const h1 = h % 360, h2 = (h1 + 40 + ((h >> 8) % 80)) % 360;
+  const init = String(name || "?").trim().charAt(0).toLowerCase().replace(/[<>&"']/g, "");
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="hsl(${h1},72%,46%)"/><stop offset="1" stop-color="hsl(${h2},76%,28%)"/></linearGradient></defs><rect width="100%" height="100%" fill="url(%23g)"/><text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle" font-family="-apple-system,Helvetica,sans-serif" font-weight="800" font-size="${Math.round(size * 0.46)}" fill="rgba(255,255,255,.93)">${init}</text></svg>`;
+  return "data:image/svg+xml," + encodeURIComponent(svg).replace(/%2523/g, "%23");
+}
+window.fitkinAvatar = avatarSvg;
 function personRow(k, mine) {
   const shared = overlap(mine, k.sports);
-  const em = ["🏃", "🎾", "🏋️", "🏊", "🚴", "🧗"][(k.name || "x").length % 6];
+  // 프로필 사진이 있으면 사진 아바타 (data URL 은 서버 규칙이 JPEG base64 만 허용)
+  const av = (typeof k.photo === "string" && k.photo.startsWith("data:image/jpeg;base64,"))
+    ? `<img src="${esc(k.photo)}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:12px">`
+    : `<img src="${avatarSvg(k.name, 80)}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:12px">`;
   // 프라이버시: 정밀 ZIP5 는 매칭에만 쓰고, 화면엔 권역(ZIP3xx)만 보여준다
   const area = (k.zip || "").slice(0, 3) + "xx";
   return `<div class="kinrow" data-kin="${esc(k.id)}" data-name="${esc(k.name)}">
-    <span class="kava">${em}</span>
+    <span class="kava">${av}</span>
     <div style="flex:1"><b>${esc(k.name)}</b><p>${shared.length
       ? `<span class="overlap">you both: ${esc(shared.slice(0, 3).join(" · "))}</span>`
       : esc((k.sports || []).slice(0, 3).join(" · "))} · ${esc(area)}</p></div></div>`;
@@ -197,6 +281,211 @@ async function paintDiscover() {
       ? rows.join("") + `<p class="dimtext" style="margin-top:10px">see someone at the gym? scan their kin code to connect.</p>`
       : `<p class="dimtext">no one in ${s.zip} yet — you're first. share fitkin with your crew.</p>`;
   } catch (e) { wrap.innerHTML = `<p class="dimtext">couldn't load nearby kin — check connection.</p>`; }
+}
+
+// ── 사진: 프로필 사진 + 운동 모먼트 (박사님 지시 08/26) ──
+// 저장은 Firestore 인라인 JPEG data URL — Storage 결제 없이 무료 티어로 간다.
+// 부적절 사진은 3중 방어: ①업로드 시점 온디바이스 NSFW 검사 ②사진별 신고 ③운영자 ban.
+function pickImage(maxDim, square) {
+  return new Promise(res => {
+    const inp = document.createElement("input");
+    inp.type = "file"; inp.accept = "image/*";
+    inp.onchange = () => {
+      const f = inp.files && inp.files[0]; if (!f) return res(null);
+      const img = new Image();
+      img.onload = () => {
+        URL.revokeObjectURL(img.src);
+        const c = document.createElement("canvas");
+        if (square) {
+          const side = Math.min(img.width, img.height);
+          c.width = c.height = Math.min(maxDim, side);
+          c.getContext("2d").drawImage(img,
+            (img.width - side) / 2, (img.height - side) / 2, side, side, 0, 0, c.width, c.height);
+        } else {
+          const sc = Math.min(1, maxDim / Math.max(img.width, img.height));
+          c.width = Math.max(1, Math.round(img.width * sc));
+          c.height = Math.max(1, Math.round(img.height * sc));
+          c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+        }
+        res(c);
+      };
+      img.onerror = () => res(null);
+      img.src = URL.createObjectURL(f);
+    };
+    inp.click();
+  });
+}
+// 온디바이스 NSFW 검사 — 모델 번들(≈5MB)은 지연 로드하되 부팅 직후 미리 데운다.
+// 로드가 60초를 넘거나 실패하면 검사를 생략하고 통과시킨다 — 어떤 경우에도
+// 업로드 흐름이 죽지 않게. 신고·인간검토(24h)·ban 이 2차 방어로 받는다.
+let nsfwModelP = null;
+function nsfwWarm() {
+  if (nsfwModelP) return nsfwModelP;
+  nsfwModelP = (async () => {
+    if (!window.__nsfw) {
+      await new Promise((res, rej) => {
+        const sc = document.createElement("script");
+        sc.src = "nsfw-bundle.js"; sc.onload = res;
+        sc.onerror = () => rej(new Error("nsfw bundle load failed"));
+        document.head.appendChild(sc);
+      });
+    }
+    try { await window.__nsfw.tf.ready(); } catch (e) {}
+    return window.__nsfw.load("MobileNetV2", { modelDefinitions: [window.__nsfw.MobileNetV2Model] });
+  })();
+  nsfwModelP.catch(() => { nsfwModelP = null; });   // 실패했으면 다음에 재시도
+  return nsfwModelP;
+}
+setTimeout(() => { try { if (st().done) nsfwWarm(); } catch (e) {} }, 8000);
+async function nsfwOk(canvas) {
+  try {
+    const model = await Promise.race([nsfwWarm(),
+      new Promise(r => setTimeout(() => r(null), 60000))]);
+    if (!model) return true;
+    const preds = await model.classify(canvas);
+    const p = n => ((preds.find(x => x.className === n) || {}).probability) || 0;
+    // 운동복·수영복은 Sexy 로 자주 오탐된다 — Porn/Hentai 는 낮게, Sexy 는 높게 끊는다
+    return (p("Porn") + p("Hentai")) < 0.4 && p("Sexy") < 0.8;
+  } catch (e) { return true; }
+}
+window.fitkinSetPhoto = async function () {
+  const c = await pickImage(256, true);
+  if (!c) return;
+  toast("checking photo — first time can take a moment…");
+  if (!(await nsfwOk(c))) { toast("that photo isn't workout-appropriate 🙅"); return; }
+  let q = 0.72, url = c.toDataURL("image/jpeg", q);
+  while (url.length > 290000 && q > 0.3) { q -= 0.12; url = c.toDataURL("image/jpeg", q); }
+  if (url.length > 290000) { toast("photo too large — try another"); return; }
+  const s = st(); s.photoData = url; s.published = 0; put(s);
+  if (window.renderCard) window.renderCard();
+  const ok = await window.fitkinPublish();
+  toast(ok ? "looking good ✓" : "photo saved — publishes when you're back online");
+};
+window.fitkinMoment = async function () {
+  const s = st();
+  if (!s.published) { toast("build your kin card first"); return; }
+  const c = await pickImage(800, false);
+  if (!c) return;
+  toast("checking photo — first time can take a moment…");
+  if (!(await nsfwOk(c))) { toast("that photo isn't workout-appropriate 🙅"); return; }
+  let q = 0.72, url = c.toDataURL("image/jpeg", q);
+  while (url.length > 690000 && q > 0.3) { q -= 0.12; url = c.toDataURL("image/jpeg", q); }
+  if (url.length > 690000) { toast("photo too large — try another"); return; }
+  const caption = (prompt("caption? (optional)") || "").slice(0, 100);
+  await ready;
+  if (!UID) { toast("you're offline — try again when you're back"); return; }
+  try {
+    await addDoc(collection(db, "photos"),
+      { owner: UID, name: (s.name || "").slice(0, 30), zip: s.zip, img: url, caption, ts: Date.now() });
+    toast("moment shared 📸");
+    paintFeed();
+  } catch (e) { toast("couldn't share — try again"); }
+};
+window.fitkinReportPhoto = async function (id) {
+  if (!confirm("report this photo as inappropriate? a human reviews every report.")) return;
+  try {
+    await ready; if (!UID) { toast("offline — try again later"); return; }
+    await addDoc(collection(db, "reports"),
+      { by: UID, about: "photo:" + id, reason: "inappropriate photo", ts: Date.now() });
+    toast("reported — thank you. we review every report.");
+  } catch (e) { toast("couldn't send the report — try again"); }
+};
+window.fitkinDeletePhoto = async function (id) {
+  if (!confirm("delete this moment?")) return;
+  try {
+        await deleteDoc(doc(db, "photos", id)); toast("deleted"); paintFeed();
+  } catch (e) { toast("couldn't delete — try again"); }
+};
+
+// ── 킨 피드: 근처 전체를 브라우즈 + 종목 필터 (박사님 지시 08/26) ──
+const FEED_SPORTS = ["running", "lifting", "tennis", "swimming", "cycling",
+                     "hiking", "yoga", "hoops", "soccer", "pickleball", "boxing", "climbing"];
+let feedSport = "";
+let feedMode = "people";
+window.fitkinFeedTab = function (mode) {
+  feedMode = mode;
+  const tp = $("#ftabPeople"), tm = $("#ftabMoments"), sh = $("#fShare"), ch = $("#feedChips");
+  if (tp) tp.classList.toggle("sel", mode === "people");
+  if (tm) tm.classList.toggle("sel", mode === "moments");
+  if (sh) sh.style.display = mode === "moments" ? "" : "none";
+  if (ch) ch.style.display = mode === "moments" ? "none" : "";
+  paintFeed();
+};
+async function paintMoments() {
+  const s = st();
+  const sub = $("#feedSub");
+  if (sub) sub.textContent = `workout moments around ${(s.zip || "").slice(0, 3)}xx — kin sharing the grind.`;
+  const wrap = $("#feedList"); if (!wrap) return;
+  try {
+    await ready;
+    const p3 = (s.zip || "").slice(0, 3);
+    const qs = await getDocs(query(collection(db, "photos"), orderBy("zip"),
+      where("zip", ">=", p3 + "00"), where("zip", "<=", p3 + "99"), limit(30)));
+    const blocked = await myBlocks();   // Set
+    const items = [];
+    qs.forEach(d => {
+      const p = d.data();
+      if (blocked.has(p.owner)) return;
+      if (typeof p.img !== "string" || !p.img.startsWith("data:image/jpeg;base64,")) return;
+      items.push({ id: d.id, ...p });
+    });
+    items.sort((a, b) => (b.ts || 0) - (a.ts || 0));
+    wrap.innerHTML = items.length
+      ? items.map(m => `<div class="moment">
+          <img src="${esc(m.img)}" alt="">
+          <div class="moment-meta">
+            <b>${esc(m.name)}</b> · ${esc((m.zip || "").slice(0, 3))}xx
+            ${m.caption ? " · " + esc(m.caption) : ""}
+            <span style="margin-left:auto;display:flex;gap:10px">
+              ${m.owner === UID
+                ? `<a href="#" onclick="fitkinDeletePhoto('${esc(m.id)}');return false" style="color:var(--mint)">delete</a>`
+                : `<a href="#" onclick="fitkinReportPhoto('${esc(m.id)}');return false" style="color:var(--mint)">report</a>`}
+            </span>
+          </div></div>`).join("")
+      : `<p class="dimtext" style="margin-top:14px">no moments around ${esc(s.zip)} yet —
+         be the first: tap <b>+ share</b> after a workout with your kin. 📸</p>`;
+  } catch (e) { console.warn("moments load failed:", e && (e.code || e.message), e); wrap.innerHTML = `<p class="dimtext">couldn't load moments — check connection.</p>`; }
+}
+window.fitkinFeed = function () {
+  $("#feed").classList.add("on"); paintFeed();
+  const list = $("#feedList");
+  if (list && !list.dataset.wired) {
+    list.dataset.wired = 1;
+    // 연결은 QR 의도 공유로만 — 피드에서 탭하면 그 원칙을 알려준다
+    list.addEventListener("click", e => {
+      const row = e.target.closest(".kinrow");
+      if (row) toast("to connect with " + row.dataset.name + ", scan their kin code in person 🤝");
+    });
+  }
+};
+window.fitkinFeedClose = function () { $("#feed").classList.remove("on"); };
+window.fitkinFeedFilter = function (sp) { feedSport = sp === feedSport ? "" : sp; paintFeed(); };
+async function paintFeed() {
+  if (feedMode === "moments") return paintMoments();
+  const s = st();
+  const chips = $("#feedChips");
+  if (chips) chips.innerHTML =
+    [`<button class="fchip${feedSport ? "" : " sel"}" onclick="fitkinFeedFilter('')">all</button>`,
+     ...FEED_SPORTS.map(sp =>
+       `<button class="fchip${feedSport === sp ? " sel" : ""}" onclick="fitkinFeedFilter('${sp}')">${esc(sp)}</button>`)].join("");
+  const sub = $("#feedSub");
+  if (sub) sub.textContent = `kin in ${s.zip} and nearby (${(s.zip || "").slice(0, 3)}xx) — tap a sport to filter.`;
+  const wrap = $("#feedList"); if (!wrap) return;
+  try {
+    const { hood, near } = await discover();
+    const flt = k => !feedSport || (k.sports || []).includes(feedSport);
+    const h = hood.filter(flt), n = near.filter(flt);
+    const rows = [
+      ...h.map(k => personRow(k, s.sports)),
+      ...(n.length ? [`<p class="dimtext" style="margin:10px 0 4px">nearby (${s.zip.slice(0, 3)}xx)</p>`] : []),
+      ...n.map(k => personRow(k, s.sports)),
+    ];
+    wrap.innerHTML = rows.length
+      ? rows.join("")
+      : `<p class="dimtext">${feedSport
+          ? `no ${esc(feedSport)} kin around ${esc(s.zip)} yet — clear the filter or share fitkin with your crew.`
+          : `no one around ${esc(s.zip)} yet — you're first. share fitkin with your crew.`}</p>`;
+  } catch (e) { wrap.innerHTML = `<p class="dimtext">couldn't load the feed — check connection.</p>`; }
 }
 
 // ── QR 킨코드 ──
@@ -403,6 +692,7 @@ let pubRetried = false;
 async function paintHome() {
   const s = st(); if (!s.done) return;
   await ready;
+  paintAcct();
   // 완전 오프라인: 스피너 대신 정직한 폴백을 그리고, 회복되면 자동 재도색
   if (!UID) {
     const off = `<p class="dimtext">you're offline — this loads when you're back.</p>`;
@@ -437,7 +727,11 @@ window.fitkinArea = async function () {
   s.homeZip = s.homeZip || s.zip;   // 첫 전환 때 홈 존 기억
   s.zip = z.trim(); s.published = 0; put(s);   // 재시도 기계 재장전
   const ok = await window.fitkinPublish();
-  if (ok) { toast(s.zip === s.homeZip ? "back home 🏠" : "now finding kin in " + s.zip + " ✈️"); paintDiscover(); }
+  if (ok) {
+    toast(s.zip === s.homeZip ? "back home 🏠" : "now finding kin in " + s.zip + " ✈️");
+    paintDiscover();
+    if ($("#feed") && $("#feed").classList.contains("on")) paintFeed();  // 피드에서 전환한 경우
+  }
 };
 window.fitkinAreaHome = async function () {
   const s = st();
@@ -452,14 +746,30 @@ window.fitkinDelete = async function () {
   if (!confirm("delete your account everywhere? this removes your card and your sign-in from fitkin's servers and this phone.")) return;
   try {
     await ready;
+    // 오프라인이면 삭제를 가장하지 않는다 — 서버까지 지울 수 있을 때만 "deleted"
+    if (!UID) { toast("you're offline — try deleting again when you're back online"); return; }
     if (UID) {
             await deleteDoc(doc(db, "profiles", UID));
     }
     // 계정 삭제 의무(심사 5.1.1(v)): 프로필 문서만이 아니라 Auth 계정(이메일 포함)까지.
-    // requires-recent-login 이면 문서는 이미 지워졌으므로 로그아웃으로 마무리한다.
+    // 오래된 세션이면(requires-recent-login) 그 자리에서 재인증받아 재시도 —
+    // "deleted" 라고 말했으면 서버에도 정말 없어야 한다.
     if (auth.currentUser) {
             try { await deleteUser(auth.currentUser); }
-      catch (e2) { try { await signOut(auth); } catch (e3) {} }
+      catch (e2) {
+        let done = false;
+        if (String(e2.code).includes("requires-recent-login") && nativeSL()) {
+          try {
+            // reauthenticate 는 다른 계정을 고르면 user-mismatch 로 거부한다 — 오삭제 봉인
+            const prov = ((auth.currentUser.providerData || [])[0] || {}).providerId || "";
+            await reauthenticateWithCredential(auth.currentUser,
+              await nativeCred(prov.includes("apple") ? "apple" : "google"));
+            await deleteUser(auth.currentUser);
+            done = true;
+          } catch (e4) {}
+        }
+        if (!done) { try { await signOut(auth); } catch (e3) {} }
+      }
     }
     localStorage.removeItem("fitkin");
     toast("deleted. take care out there 💚");
@@ -468,5 +778,7 @@ window.fitkinDelete = async function () {
 };
 
 window.fitkinHome = paintHome;
+// 인라인 renderCard 는 번들보다 먼저 실행돼 SVG 아바타를 모른다 — 로드 직후 한 번 재도색
+try { if (window.renderCard && st().done) window.renderCard(); } catch (e) {}
 handleKinLink();
 if (st().done) ready.then(paintHome);

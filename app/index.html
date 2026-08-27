@@ -136,6 +136,21 @@
   #scanner p{color:var(--mint);font-weight:700}
   #scanner .btn{width:min(86vw,380px)}
   .overlap{color:var(--volt);font-weight:700}
+  #feed{position:fixed;inset:0;background:var(--bg);z-index:55;display:none;flex-direction:column;
+        padding:max(18px,env(safe-area-inset-top)) 18px calc(14px + env(safe-area-inset-bottom));
+        max-width:430px;margin:0 auto}
+  #feed.on{display:flex}
+  #feedList{flex:1;overflow-y:auto;margin-top:10px}
+  .fchips{display:flex;gap:8px;overflow-x:auto;padding:10px 0 4px;flex:none;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+  .fchips::-webkit-scrollbar{display:none}
+  .fchip{flex:none;border:1.5px solid var(--line);background:var(--card);border-radius:99px;
+         padding:8px 14px;font-family:inherit;font-size:14px;font-weight:650;color:var(--ink);cursor:pointer}
+  .fchip.sel{background:var(--volt);border-color:var(--volt);color:#0c120e}
+  .moment{background:var(--card);border:1px solid var(--line);border-radius:var(--r);
+          overflow:hidden;margin:12px 0}
+  .moment img{width:100%;display:block;max-height:420px;object-fit:cover}
+  .moment-meta{display:flex;align-items:center;gap:8px;padding:10px 14px;font-size:13.5px;color:var(--dim)}
+  .moment-meta b{color:var(--ink)}
   #chat{position:fixed;inset:0;background:var(--bg);z-index:60;display:none;flex-direction:column;
         padding:max(18px,env(safe-area-inset-top)) 18px calc(14px + env(safe-area-inset-bottom));
         max-width:430px;margin:0 auto}
@@ -223,14 +238,21 @@
     <div class="opt-group"><div class="opt-label">your zip code</div>
       <input class="field" id="fZip" maxlength="5" inputmode="numeric" pattern="[0-9]*"
              placeholder="e.g. 94301 — how we find kin near you"></div>
-    <div class="cta"><button class="btn" id="b3" disabled onclick="finish()">build my kin card</button></div>
+    <div class="cta">
+      <button class="btn" id="b3" disabled onclick="finish()">build my kin card</button>
+      <p style="text-align:center;font-size:11.5px;color:var(--dim);margin-top:8px;line-height:1.5">
+        by building your card you agree to the
+        <a href="https://pbseq.github.io/fitkin/terms.html" style="color:var(--mint)">terms</a> &amp;
+        <a href="https://pbseq.github.io/fitkin/privacy.html" style="color:var(--mint)">privacy policy</a> —
+        fitkin introduces people; meetups are at your own risk.</p>
+    </div>
   </section>
 
   <!-- 4 · Home -->
   <section class="screen" id="s4">
     <div class="logo"><img src="../mark.png" alt="" style="height:26px;vertical-align:-5px;margin-right:6px">fit<b>kin</b></div>
     <div class="card"><div class="me">
-      <div class="ava" id="hAva">🏃</div>
+      <div class="ava" id="hAva" onclick="fitkinSetPhoto()" style="cursor:pointer" title="add a profile photo">🏃</div>
       <div><h3>your kin card</h3><p id="hLine"></p></div>
     </div><div class="tags" id="hTags"></div></div>
 
@@ -249,7 +271,8 @@
         <button class="chat-act" onclick="fitkinAreaHome()">🏠</button></span>
       </div>
       <p class="dimtext" style="font-size:12.5px;margin-bottom:8px">your kin card (name · sports · area) is visible to other fitkin users — that's how kin find each other.</p>
-      <div id="nearList"><p class="dimtext">finding people in your zip…</p></div></div>
+      <div id="nearList"><p class="dimtext">finding people in your zip…</p></div>
+      <button class="scanbtn" onclick="fitkinFeed()" style="width:100%">👀 open kin feed — browse everyone</button></div>
 
     <div class="card"><h3 style="font-size:17px;margin-bottom:8px">your kin</h3>
       <div id="kinList"><p class="dimtext">loading…</p></div></div>
@@ -258,6 +281,7 @@
       <button class="btn" onclick="location.href='https://pathobrain.gumroad.com/l/fitkin'">
         claim founding spot — free</button>
       <button class="btn ghost" onclick="reset()">redo my card</button>
+      <p id="acctRow" style="text-align:center;font-size:13px;color:var(--dim);margin-top:2px"></p>
       <p style="text-align:center;font-size:12.5px;color:var(--dim);margin-top:6px">
         <a href="mailto:pathobrainseq@gmail.com?subject=fitkin%20report" style="color:var(--mint)">report a problem</a> ·
         <a href="https://pbseq.github.io/fitkin/privacy.html" style="color:var(--mint)">privacy</a> ·
@@ -277,7 +301,9 @@ st.sports=st.sports||[]; st.days=st.days||[]; st.vibe=st.vibe||{};
 const $=q=>document.querySelector(q);
 function go(n){document.querySelectorAll(".screen").forEach(s=>s.classList.remove("on"));
   $("#s"+n).classList.add("on");window.scrollTo(0,0);save()}
-function save(){localStorage.setItem("fitkin",JSON.stringify(st))}
+function save(){const f=JSON.parse(localStorage.getItem("fitkin")||"{}");
+  if(f.photoData&&!st.photoData)st.photoData=f.photoData;   // 번들이 저장한 프로필 사진 보존
+  localStorage.setItem("fitkin",JSON.stringify(st))}
 
 SPORTS.forEach(([e,n])=>{const c=document.createElement("div");c.className="chip";
   c.textContent=e+" "+n; if(st.sports.includes(n))c.classList.add("sel");
@@ -308,7 +334,12 @@ checkS3();
 // 렌더(로컬)와 발행(네트워크)을 분리 — 매 로드마다 재발행하지 않는다
 function renderCard(){
   const em=(SPORTS.find(([e,n])=>n===st.sports[0])||["🏃"])[0];
-  $("#hAva").textContent=em;
+  const fresh=JSON.parse(localStorage.getItem("fitkin")||"{}");
+  if(fresh.photoData)
+    $("#hAva").innerHTML='<img src="'+fresh.photoData+'" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:16px">';
+  else if(window.fitkinAvatar&&st.name)
+    $("#hAva").innerHTML='<img src="'+window.fitkinAvatar(st.name,120)+'" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:16px">';
+  else $("#hAva").textContent=em;
   $("#hLine").textContent=(st.name?st.name+" · ":"")+[st.vibe.time,st.vibe.mode,st.vibe.level].filter(Boolean).join(" · ");
   $("#hTags").innerHTML=st.sports.map(s=>`<span class="tag">${s}</span>`).join("")
     +`<span class="tag">${st.days.length} days/week</span>`
@@ -321,10 +352,27 @@ function finish(){
   if(window.fitkinPublish)window.fitkinPublish();   // 최초 발행 (이후 로드는 렌더만)
 }
 if(st.done)renderCard();
+window.renderCard=renderCard;   // 번들이 프로필 사진 갱신 후 재도색할 수 있게
 function reset(){localStorage.removeItem("fitkin");location.reload()}
 </script>
 <div id="scanner"><p>point at a kin code</p><video id="scanVid" playsinline></video>
   <button class="btn ghost" onclick="fitkinScanStop()">cancel</button></div>
+<div id="feed">
+  <div class="chat-head">
+    <b>👀 kin feed</b>
+    <span style="display:flex;align-items:center;gap:6px">
+      <button class="chat-act" onclick="fitkinArea()">✈️ area</button>
+      <button class="chat-act" onclick="fitkinFeedClose()" aria-label="close">✕</button>
+    </span></div>
+  <div style="display:flex;gap:8px;margin-top:10px;flex:none">
+    <button class="fchip sel" id="ftabPeople" onclick="fitkinFeedTab('people')">👥 people</button>
+    <button class="fchip" id="ftabMoments" onclick="fitkinFeedTab('moments')">📸 moments</button>
+    <button class="fchip" id="fShare" onclick="fitkinMoment()" style="margin-left:auto;display:none">+ share</button>
+  </div>
+  <p class="dimtext" style="font-size:12.5px;margin-top:6px" id="feedSub">everyone near your zip — tap a sport to filter.</p>
+  <div class="fchips" id="feedChips"></div>
+  <div id="feedList"><p class="dimtext">loading…</p></div>
+</div>
 <div id="chat">
   <div class="chat-head">
     <b id="chatName" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:38vw">kin</b>

@@ -19,7 +19,9 @@
   },
   "homepage": "https://github.com/PBSeq/fitkin#readme",
   "dependencies": {
+    "@tensorflow/tfjs": "^4.22.0",
     "esbuild": "^0.28.2",
-    "firebase": "^12.18.0"
+    "firebase": "^12.18.0",
+    "nsfwjs": "^4.3.0"
   }
 }

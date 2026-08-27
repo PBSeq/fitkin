@@ -2,14 +2,27 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // v3 (익명인증 기반 정석 설계):
+    // v6: + 운영자 ban(banned/{uid} 존재 = 발행·사진·메시지 전면 정지, 관리 토큰만 쓴다)
+    //     + 프로필 사진(photo)·운동 사진 피드(photos)
+    function notBanned() {
+      return !exists(/databases/$(database)/documents/banned/$(request.auth.uid));
+    }
+    match /banned/{uid} {
+      allow read, write: if false;   // 운영자(관리 토큰) 전용
+    }
+
     // 문서 ID = auth.uid. 본인만 쓰기, 프로필 읽기는 공개(매칭이 제품).
     // zip 은 5자리 숫자만 — GPS 없이 성긴 위치로 동네·근처 매칭.
     match /profiles/{uid} {
       allow read: if true;
       allow create, update: if request.auth != null
                     && request.auth.uid == uid
-                    && request.resource.data.keys().hasOnly(['name','sports','vibe','days','zip','ts'])
+                    && notBanned()
+                    && request.resource.data.keys().hasOnly(['name','sports','vibe','days','zip','ts','photo'])
+                    && (!('photo' in request.resource.data)
+                        || (request.resource.data.photo is string
+                            && request.resource.data.photo.size() <= 300000
+                            && request.resource.data.photo.matches('^data:image/jpeg;base64,[A-Za-z0-9+/=]+$')))
                     && request.resource.data.keys().hasAll(['name','sports','vibe','days','zip','ts'])
                     && request.resource.data.name is string
                     && request.resource.data.name.size() >= 1
@@ -79,6 +92,7 @@ service cloud.firestore {
       }
       allow read: if isParty();
       allow create: if isParty()
+                    && notBanned()
                     && !exists(/databases/$(database)/documents/blocks/$(otherUid())/users/$(request.auth.uid))
                     && request.resource.data.keys().hasOnly(['from','text','ts'])
                     && request.resource.data.from == request.auth.uid
@@ -87,6 +101,29 @@ service cloud.firestore {
                     && request.resource.data.text.size() <= 200
                     && request.resource.data.ts is number;
       allow update, delete: if false;
+    }
+
+    // 운동 사진 피드(moments): 근처 공개. 본인만 올리고 본인만 지운다.
+    // 이미지는 JPEG data URL 인라인(Storage 결제 없이 무료 티어로) — 700KB 상한.
+    match /photos/{id} {
+      allow read: if true;
+      allow create: if request.auth != null
+                    && notBanned()
+                    && request.resource.data.keys().hasOnly(['owner','name','zip','img','caption','ts'])
+                    && request.resource.data.owner == request.auth.uid
+                    && exists(/databases/$(database)/documents/profiles/$(request.auth.uid))
+                    && request.resource.data.name is string
+                    && request.resource.data.name.size() <= 30
+                    && request.resource.data.zip is string
+                    && request.resource.data.zip.matches('^[0-9]{5}$')
+                    && request.resource.data.img is string
+                    && request.resource.data.img.size() <= 700000
+                    && request.resource.data.img.matches('^data:image/jpeg;base64,[A-Za-z0-9+/=]+$')
+                    && request.resource.data.caption is string
+                    && request.resource.data.caption.size() <= 100
+                    && request.resource.data.ts is number;
+      allow delete: if request.auth != null && resource.data.owner == request.auth.uid;
+      allow update: if false;
     }
 
     // 신고: 인앱 제출(본인 명의만). 열람은 운영자(관리 토큰)만 — 클라이언트 read 금지.
