@@ -207,7 +207,13 @@ async function paintDiscover() {
 }
 
 // ── QR 킨코드 ──
-function kinUrl(id) { return location.origin + location.pathname + "#kin=" + id; }
+// 네이티브 앱의 location 은 capacitor://localhost — 그대로 공유·QR에 넣으면
+// 받는 쪽이 못 여는 죽은 링크가 된다. 웹이 아닐 땐 정식 웹 주소로 고정.
+const WEB_APP_URL = "https://pbseq.github.io/fitkin/app/";
+function kinUrl(id) {
+  const onWeb = location.protocol.startsWith("http") && !["localhost", "127.0.0.1"].includes(location.hostname);
+  return (onWeb ? location.origin + location.pathname : WEB_APP_URL) + "#kin=" + id;
+}
 window.fitkinDrawQR = function () {
   const s = st(); if (!s.id) return;
   const box = $("#qrCanvas"); if (!box || !window.qrcode) return;
@@ -380,14 +386,23 @@ window.fitkinChatClose = function () {
   $("#chat").classList.remove("on");
 };
 
-// ── 링크 공유 (QR 없이도 — 카피 약속 이행) ──
+// ── 링크 공유 — 네이티브는 시스템 공유 시트(플러그인), 웹은 navigator.share.
+//    어느 단계가 죽어도 다음 폴백으로: 시트 → share API → 클립보드 → 링크 표시.
 window.fitkinShare = async function () {
   const s = st(); if (!s.id) { toast("your code is still being made — try in a sec"); return; }
   const url = kinUrl(s.id);
+  const NS = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Share;
   try {
-    if (navigator.share) await navigator.share({ title: "be my fitkin", url });
-    else { await navigator.clipboard.writeText(url); toast("link copied — send it to your kin"); }
+    if (NS) { await NS.share({ title: "be my fitkin", url }); return; }
+  } catch (e) { if (String(e.message || e).toLowerCase().includes("cancel")) return; }
+  try {
+    if (navigator.share) { await navigator.share({ title: "be my fitkin", url }); return; }
+  } catch (e) { if (String(e.name).includes("Abort")) return; }
+  try {
+    await navigator.clipboard.writeText(url);
+    toast("link copied — send it to your kin"); return;
   } catch (e) {}
+  prompt("copy your kin link:", url);
 };
 
 // ── 홈 ──
