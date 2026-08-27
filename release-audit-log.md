@@ -241,3 +241,7 @@ Codex 3차: 수리 5건 전원 OK, 전 파일 재스윕 신규 결함 0건 → *
 - 사전 검사 이슈: "Incomplete advertising ID declaration" → 실원인은 **Firebase 라이브러리가 주입한 AD_ID·ADSERVICES 권한 5종** + 웹 Save가 v1을 completed로 박아버림 → 매니페스트 tools:node="remove" 5종 + versionCode 3 클린 빌드로 트랙 대체 커밋 성공
 - 현재: 사전 검사 통과 시 자동 심사 발송 대기
 - 교훈: **선언과 바이너리는 함께 검증된다** — "광고 안 씀"이라 말하려면 라이브러리가 몰래 넣은 권한까지 지워야 한다. 그리고 Play 웹 UI의 Save는 draft를 completed로 승격시킬 수 있다 — API 트랙 상태를 커밋 전에 GET으로 확인할 것
+
+### 13차 종결 — 🚀 Google Play 심사 진입 확인 (2026-08-27 아침)
+
+"Your changes are now in review" — 사전 검사 통과, v1.1(3) 심사 중. 이로써 **iOS(WAITING_FOR_REVIEW) + Android(IN REVIEW) 양대 스토어 동시 심사** 달성. 아이디어 발제(08/24)부터 3일.
