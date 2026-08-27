@@ -107,7 +107,7 @@ service cloud.firestore {
     // 운동 사진 피드(moments): 근처 공개. 본인만 올리고 본인만 지운다.
     // 이미지는 JPEG data URL 인라인(Storage 결제 없이 무료 티어로) — 700KB 상한.
     match /photos/{id} {
-      allow read: if true;
+      allow read: if request.auth != null;   // 사진은 로그인(익명 포함) 사용자에게만 — 무인증 전수수집 차단
       allow create: if request.auth != null
                     && notBanned()
                     && request.resource.data.keys().hasOnly(['owner','name','zip','img','caption','ts'])

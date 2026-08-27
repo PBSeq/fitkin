@@ -446,7 +446,7 @@ async function paintMoments() {
           </div></div>`).join("")
       : `<p class="dimtext" style="margin-top:14px">no moments around ${esc(s.zip)} yet —
          be the first: tap <b>+ share</b> after a workout with your kin. 📸</p>`;
-  } catch (e) { console.warn("moments load failed:", e && (e.code || e.message), e); wrap.innerHTML = `<p class="dimtext">couldn't load moments — check connection.</p>`; }
+  } catch (e) { wrap.innerHTML = `<p class="dimtext">couldn't load moments — check connection.</p>`; }
 }
 window.fitkinFeed = function () {
   $("#feed").classList.add("on"); paintFeed();
@@ -750,16 +750,22 @@ window.fitkinDelete = async function () {
     await ready;
     // 오프라인이면 삭제를 가장하지 않는다 — 서버까지 지울 수 있을 때만 "deleted"
     if (!UID) { toast("you're offline — try deleting again when you're back online"); return; }
-        // 내 모먼트 사진부터 — Auth 를 지운 뒤엔 본인도 못 지우게 되므로 순서가 중요하다
+        // ① 내 모먼트 사진 전부 — 페이지 단위로 반복(100장 한도 없음). 하나라도 실패하면
+    //    성공을 가장하지 않고 여기서 멈춘다.
     try {
-      const mine = await getDocs(query(collection(db, "photos"),
-        where("owner", "==", UID), limit(100)));
-      for (const d of mine.docs) await deleteDoc(d.ref);
-    } catch (ep) {}
+      for (let page = 0; page < 50; page++) {
+        const mine = await getDocs(query(collection(db, "photos"),
+          where("owner", "==", UID), limit(100)));
+        if (mine.empty) break;
+        for (const d of mine.docs) await deleteDoc(d.ref);
+        if (mine.size < 100) break;
+      }
+    } catch (ep) { toast("couldn't remove your photos — check connection and try again"); return; }
+    // ② 카드
     await deleteDoc(doc(db, "profiles", UID));
-    // 계정 삭제 의무(심사 5.1.1(v)): Auth 계정(이메일 포함)까지. 오래된 세션이면
-    // 그 자리에서 재인증(네이티브 시트/웹 팝업) 후 재시도. 실패하면 성공을 가장하지
-    // 않고 정직하게 남은 단계를 알린다.
+    // ③ Auth 계정(심사 5.1.1(v)) — 오래된 세션이면 그 자리에서 재인증 후 재시도.
+    //    실패해도 로그아웃하거나 로컬을 지우지 않는다: 같은 버튼을 다시 누르면
+    //    (①②는 no-op) 재인증부터 자연스럽게 재시도된다.
     let authDeleted = true;
     if (auth.currentUser && !auth.currentUser.isAnonymous) {
             try { await deleteUser(auth.currentUser); }
@@ -780,16 +786,17 @@ window.fitkinDelete = async function () {
             authDeleted = true;
           } catch (e4) {}
         }
-        if (!authDeleted) { try { await signOut(auth); } catch (e3) {} }
       }
     } else if (auth.currentUser) {
             try { await deleteUser(auth.currentUser); } catch (e5) {}
     }
+    if (!authDeleted) {
+      toast("your card and photos are gone, but we couldn't confirm it's you — tap delete my profile once more to finish");
+      return;
+    }
     localStorage.removeItem("fitkin");
-    toast(authDeleted
-      ? "deleted. take care out there 💚"
-      : "your card and photos are deleted. to finish removing your sign-in, sign in once more and delete again.");
-    setTimeout(() => location.reload(), authDeleted ? 1200 : 3200);
+    toast("deleted. take care out there 💚");
+    setTimeout(() => location.reload(), 1200);
   } catch (e) { toast("couldn't reach the server — try again online"); }
 };
 
