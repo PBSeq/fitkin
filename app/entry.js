@@ -4,7 +4,7 @@
 import { initializeApp } from "firebase/app";
 import { initializeAuth, indexedDBLocalPersistence, browserLocalPersistence, browserPopupRedirectResolver, signInAnonymously, onAuthStateChanged, signInWithCredential, GoogleAuthProvider, OAuthProvider, deleteUser, linkWithCredential, linkWithPopup, reauthenticateWithCredential, reauthenticateWithPopup, signInWithPopup, signOut }
   from "firebase/auth";
-import { getFirestore, collection, doc, setDoc, getDoc, getDocs, query, where, orderBy, limit, limitToLast, addDoc, onSnapshot, deleteDoc }
+import { getFirestore, collection, doc, setDoc, getDoc, getDocs, query, where, orderBy, limit, limitToLast, addDoc, onSnapshot, deleteDoc, updateDoc }
   from "firebase/firestore";
 
 const app = initializeApp({
@@ -282,6 +282,7 @@ async function paintDiscover() {
     wrap.innerHTML = rows.length
       ? rows.join("") + `<p class="dimtext" style="margin-top:10px">see someone at the gym? scan their kin code to connect.</p>`
       : `<p class="dimtext">no one in ${s.zip} yet — you're first. share fitkin with your crew.</p>`;
+    decorateRows(wrap);
   } catch (e) { wrap.innerHTML = `<p class="dimtext">couldn't load nearby kin — check connection.</p>`; }
 }
 
@@ -487,6 +488,7 @@ async function paintFeed() {
       : `<p class="dimtext">${feedSport
           ? `no ${esc(feedSport)} kin around ${esc(s.zip)} yet — clear the filter or share fitkin with your crew.`
           : `no one around ${esc(s.zip)} yet — you're first. share fitkin with your crew.`}</p>`;
+    if (rows.length) decorateRows(wrap);
   } catch (e) { wrap.innerHTML = `<p class="dimtext">couldn't load the feed — check connection.</p>`; }
 }
 
@@ -579,6 +581,25 @@ async function myKin() {
   return out;
 }
 
+// 리스트 행에 리뷰 배지 비동기 주입 (recent 50 요약)
+async function decorateRows(container) {
+  if (!container) return;
+  for (const r of [...container.querySelectorAll(".kinrow[data-kin]")].slice(0, 8)) {
+    try {
+      const sm = await reviewSummary(r.dataset.kin);
+      if (!sm.n) continue;
+      const p = r.querySelector("p");
+      if (p && !p.querySelector(".rvbadge")) {
+        const b = document.createElement("span");
+        b.className = "rvbadge";
+        b.textContent = sm.avg
+          ? ` · ★${sm.avg} (${sm.n >= 50 ? "50+" : sm.n})` + (sm.level ? ` · ${sm.level} ✓` : "")
+          : " · new kin";
+        p.appendChild(b);
+      }
+    } catch (e) {}
+  }
+}
 async function paintKin() {
   const wrap = $("#kinList"); if (!wrap) return;
   const s = st();
@@ -588,11 +609,117 @@ async function paintKin() {
   for (const k of kin) { if (!(await isBlockedByMe(k.id))) keep.push(k); }
   kin = keep;
   wrap.innerHTML = kin.length
-    ? kin.map(k => personRow(k, s.sports)).join("")
+    ? kin.map(k => personRow(k, s.sports) +
+        `<div style="text-align:right;margin:-6px 0 4px"><button class="chat-act rv-btn"
+           data-kin="${esc(k.id)}" data-name="${esc(k.name)}">★ rate</button></div>`).join("")
       + `<p class="dimtext" style="margin-top:8px">tap a kin to message them.</p>`
     : `<p class="dimtext">no kin yet — show your code to someone at the gym.</p>`;
   wrap.querySelectorAll(".kinrow").forEach(r =>
     r.onclick = () => openChat(r.dataset.kin, r.dataset.name));
+  // XSS 봉인: 이름을 JS 문자열에 인라인하지 않는다 — data 속성(큰따옴표 esc)만
+  wrap.querySelectorAll(".rv-btn").forEach(b =>
+    b.onclick = e => { e.stopPropagation(); fitkinReview(b.dataset.kin, b.dataset.name); });
+  decorateRows(wrap);
+}
+
+// ── 킨 리뷰 (v1.2 · 설계 LOCKED) — 별점 3~5, 긍정 태그, 더블 블라인드 ──
+const REVIEW_TAGS = ["on-time", "great-energy", "matched-level", "good-communicator",
+                     "would-train-again", "pushes-me", "patient-teacher"];
+let rvTarget = null, rvStars = 0, rvTags = [], rvLevel = "";
+window.fitkinReview = async function (uid, name) {
+  rvTarget = { uid, name }; rvStars = 0; rvTags = []; rvLevel = "";
+  $("#rvName").textContent = name;
+  $("#rvComment").value = "";
+  // 기존 리뷰 로드(수정 모드)
+  try {
+    await ready;
+    const snap = await getDoc(doc(db, "reviews", UID + "_" + uid));
+    if (snap.exists()) {
+      const d = snap.data();
+      rvStars = d.stars; rvTags = d.tags || []; rvLevel = d.levelCheck || "";
+      $("#rvComment").value = d.comment || "";
+      // 상대가 그새 리뷰했으면 내 잠긴 리뷰를 즉시 공개로 당긴다 (더블 블라인드 완결)
+      if (d.visibleAfter > Date.now()) {
+        const theirs = await getDoc(doc(db, "reviews", uid + "_" + UID));
+        if (theirs.exists()) {
+                    await updateDoc(doc(db, "reviews", UID + "_" + uid), { visibleAfter: Date.now() });
+        }
+      }
+    }
+  } catch (e) {}
+  paintReviewSheet();
+  $("#review").classList.add("on");
+};
+window.fitkinReviewClose = function () { $("#review").classList.remove("on"); };
+window.fitkinRvStar = function (n) {
+  if (n < 3) {
+    // 정직한 UX: 나쁜 경험은 별점이 아니라 신고·차단 경로로 (설계 §6-1)
+    toast("had a bad experience? use report or block in the chat — reviews here are for kin you'd train with again");
+    return;
+  }
+  rvStars = n; paintReviewSheet();
+};
+window.fitkinRvTag = function (t) {
+  rvTags = rvTags.includes(t) ? rvTags.filter(x => x !== t) : (rvTags.length < 5 ? [...rvTags, t] : rvTags);
+  paintReviewSheet();
+};
+window.fitkinRvLevel = function (l) { rvLevel = rvLevel === l ? "" : l; paintReviewSheet(); };
+function paintReviewSheet() {
+  $("#rvStars").innerHTML = [1, 2, 3, 4, 5].map(n =>
+    `<button class="rvstar${n <= rvStars ? " sel" : ""}" onclick="fitkinRvStar(${n})">★</button>`).join("");
+  $("#rvTags").innerHTML = REVIEW_TAGS.map(t =>
+    `<button class="fchip${rvTags.includes(t) ? " sel" : ""}" onclick="fitkinRvTag('${t}')">${t.replace(/-/g, " ")}</button>`).join("");
+  $("#rvLevels").innerHTML = ["new-ish", "steady", "serious"].map(l =>
+    `<button class="fchip${rvLevel === l ? " sel" : ""}" onclick="fitkinRvLevel('${l}')">${l}</button>`).join("");
+  $("#rvSubmit").disabled = !rvStars;
+}
+window.fitkinReviewSubmit = async function () {
+  if (!rvTarget || !rvStars) return;
+  try {
+    await ready;
+    if (!UID) { toast("you're offline — try again when you're back"); return; }
+    // 상대가 이미 나를 리뷰했으면 즉시 공개, 아니면 14일 블라인드
+    let visibleAfter = Date.now() + 1209600000;
+    try {
+      const theirs = await getDoc(doc(db, "reviews", rvTarget.uid + "_" + UID));
+      if (theirs.exists()) visibleAfter = Date.now();
+    } catch (e) {}
+    const linkId = UID < rvTarget.uid ? UID + "_" + rvTarget.uid : rvTarget.uid + "_" + UID;
+    const ref = doc(db, "reviews", UID + "_" + rvTarget.uid);
+    const prev = await getDoc(ref);
+    if (prev.exists()) {
+            await updateDoc(ref, { stars: rvStars, tags: rvTags,
+        comment: $("#rvComment").value.trim().slice(0, 140), levelCheck: rvLevel,
+        visibleAfter: Math.min(visibleAfter, prev.data().visibleAfter) });
+    } else {
+      await setDoc(ref, { from: UID, to: rvTarget.uid, linkId, stars: rvStars, tags: rvTags,
+        comment: $("#rvComment").value.trim().slice(0, 140), levelCheck: rvLevel,
+        ts: Date.now(), visibleAfter });
+    }
+    fitkinReviewClose();
+    toast(visibleAfter <= Date.now()
+      ? "review posted ✓"
+      : "review saved — it goes live when they review you back, or in 14 days");
+  } catch (e) {
+    if (String(e.code).includes("permission"))
+      toast("reviews open 24h after you become kin — see you tomorrow ✨");
+    else toast("couldn't save the review — try again");
+  }
+};
+// 리뷰 요약 조회 (recent 50): 평균★·수·level 분포 — personRow 배지용
+async function reviewSummary(uid) {
+  try {
+    const qs = await getDocs(query(collection(db, "reviews"),
+      where("to", "==", uid), where("visibleAfter", "<=", Date.now() - 30000),
+      orderBy("visibleAfter", "desc"), limit(50)));
+    let sum = 0, n = 0; const lv = {};
+    qs.forEach(d => { const r = d.data(); sum += r.stars; n++;
+      if (r.levelCheck) lv[r.levelCheck] = (lv[r.levelCheck] || 0) + 1; });
+    if (n < 3) return { n, label: n ? "new kin" : "" };   // 3개 미만: 평균 숨김 (설계 §1)
+    const top = Object.entries(lv).sort((a, b) => b[1] - a[1])[0];
+    return { n, avg: (sum / n).toFixed(1),
+      level: top && top[1] >= 3 ? top[0] : null };        // level 배지는 3표+
+  } catch (e) { return { n: 0, label: "" }; }
 }
 
 // ── 차단·신고 (Apple 1.2 UGC 안전장치) — blocks/{내uid}/users/{상대uid} ──
@@ -761,6 +888,17 @@ window.fitkinDelete = async function () {
         if (mine.size < 100) break;
       }
     } catch (ep) { toast("couldn't remove your photos — check connection and try again"); return; }
+    // ①-b 내가 쓴 리뷰 청산. 받은 리뷰는 블라인드 규칙상 클라가 열거 불가 —
+    //    운영(moderate.py cleanorphans)이 지운다 (고아 리뷰는 to 가 없어 어차피 미표시).
+    try {
+      for (let page = 0; page < 20; page++) {
+        const mine = await getDocs(query(collection(db, "reviews"),
+          where("from", "==", UID), limit(100)));
+        if (mine.empty) break;
+        for (const d of mine.docs) await deleteDoc(d.ref);
+        if (mine.size < 100) break;
+      }
+    } catch (er) { toast("couldn't remove your reviews — check connection and try again"); return; }
     // ② 카드
     await deleteDoc(doc(db, "profiles", UID));
     // ③ Auth 계정(심사 5.1.1(v)) — 오래된 세션이면 그 자리에서 재인증 후 재시도.

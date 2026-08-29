@@ -64,7 +64,10 @@ service cloud.firestore {
                     && exists(/databases/$(database)/documents/profiles/$(request.resource.data.b))
                     && id == (request.resource.data.a < request.resource.data.b
                               ? request.resource.data.a + '_' + request.resource.data.b
-                              : request.resource.data.b + '_' + request.resource.data.a);
+                              : request.resource.data.b + '_' + request.resource.data.a)
+                    && request.resource.data.ts is number
+                    && request.resource.data.ts >= request.time.toMillis() - 300000
+                    && request.resource.data.ts <= request.time.toMillis() + 300000;
       allow update, delete: if false;
     }
 
@@ -141,6 +144,64 @@ service cloud.firestore {
                     && request.resource.data.app.size() <= 10
                     && request.resource.data.ts is number;
       allow read, update, delete: if false;
+    }
+
+
+    // 킨 리뷰 (v1.2 · 설계 LOCKED 2026-08-28): 킨만, 킨당 1회(docId 강제), 별점 3~5,
+    // 더블 블라인드를 규칙으로 강제 — 미공개 리뷰는 작성자 외 SDK 직쿼리로도 못 읽는다.
+    match /reviews/{id} {
+      function lnkId() {
+        return request.resource.data.from < request.resource.data.to
+          ? request.resource.data.from + '_' + request.resource.data.to
+          : request.resource.data.to + '_' + request.resource.data.from;
+      }
+      allow read: if request.auth != null
+                  && (resource == null
+                      || resource.data.from == request.auth.uid
+                      || resource.data.visibleAfter <= request.time.toMillis());
+      allow create: if request.auth != null
+                    && notBanned()
+                    && request.resource.data.keys().hasOnly(['from','to','linkId','stars','tags','comment','levelCheck','ts','visibleAfter'])
+                    && request.resource.data.from == request.auth.uid
+                    && request.resource.data.to is string
+                    && request.resource.data.from != request.resource.data.to
+                    && id == request.auth.uid + '_' + request.resource.data.to
+                    && request.resource.data.linkId == lnkId()
+                    && exists(/databases/$(database)/documents/links/$(lnkId()))
+                    && get(/databases/$(database)/documents/links/$(lnkId())).data.ts + 86400000 <= request.time.toMillis()
+                    && request.resource.data.stars is int
+                    && request.resource.data.stars >= 3
+                    && request.resource.data.stars <= 5
+                    && request.resource.data.tags is list
+                    && request.resource.data.tags.size() <= 5
+                    && request.resource.data.tags.hasOnly(['on-time','great-energy','matched-level','good-communicator','would-train-again','pushes-me','patient-teacher'])
+                    && request.resource.data.comment is string
+                    && request.resource.data.comment.size() <= 140
+                    && request.resource.data.levelCheck in ['','new-ish','steady','serious']
+                    && request.resource.data.ts is number
+                    && request.resource.data.visibleAfter is number
+                    && request.resource.data.visibleAfter >= request.resource.data.ts
+                    && request.resource.data.visibleAfter <= request.resource.data.ts + 1209600000;
+      allow update: if request.auth != null
+                    && notBanned()
+                    && resource.data.from == request.auth.uid
+                    && request.resource.data.diff(resource.data).affectedKeys()
+                         .hasOnly(['stars','tags','comment','levelCheck','visibleAfter'])
+                    && request.resource.data.tags is list
+                    && request.resource.data.comment is string
+                    && request.resource.data.visibleAfter is number
+                    && request.resource.data.stars is int
+                    && request.resource.data.stars >= 3
+                    && request.resource.data.stars <= 5
+                    && request.resource.data.tags.size() <= 5
+                    && request.resource.data.tags.hasOnly(['on-time','great-energy','matched-level','good-communicator','would-train-again','pushes-me','patient-teacher'])
+                    && request.resource.data.comment.size() <= 140
+                    && request.resource.data.levelCheck in ['','new-ish','steady','serious']
+                    && request.resource.data.visibleAfter >= resource.data.ts
+                    && request.resource.data.visibleAfter <= resource.data.ts + 1209600000;
+      // from(작성자 삭제) 또는 to(계정 삭제 시 받은 리뷰 청산 — 별점 3~5뿐이라 삭제 악용 실익 없음)
+      allow delete: if request.auth != null
+                    && (resource.data.from == request.auth.uid || resource.data.to == request.auth.uid);
     }
 
     // 신고: 인앱 제출(본인 명의만). 열람은 운영자(관리 토큰)만 — 클라이언트 read 금지.

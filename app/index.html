@@ -146,6 +146,14 @@
   .fchip{flex:none;border:1.5px solid var(--line);background:var(--card);border-radius:99px;
          padding:8px 14px;font-family:inherit;font-size:14px;font-weight:650;color:var(--ink);cursor:pointer}
   .fchip.sel{background:var(--volt);border-color:var(--volt);color:#0c120e}
+  #review{position:fixed;inset:0;background:var(--bg);z-index:58;display:none;flex-direction:column;
+          padding:max(18px,env(safe-area-inset-top)) 18px calc(14px + env(safe-area-inset-bottom));
+          max-width:430px;margin:0 auto;overflow-y:auto}
+  #review.on{display:flex}
+  .rvstar{background:none;border:0;font-size:38px;color:var(--line);cursor:pointer;padding:2px 6px;
+          font-family:inherit;transition:.12s}
+  .rvstar.sel{color:var(--volt);text-shadow:0 0 18px rgba(204,242,78,.4)}
+  .rvbadge{color:var(--volt);font-weight:650}
   .moment{background:var(--card);border:1px solid var(--line);border-radius:var(--r);
           overflow:hidden;margin:12px 0}
   .moment img{width:100%;display:block;max-height:420px;object-fit:cover}
@@ -364,6 +372,22 @@ function reset(){localStorage.removeItem("fitkin");location.reload()}
 </script>
 <div id="scanner"><p>point at a kin code</p><video id="scanVid" playsinline></video>
   <button class="btn ghost" onclick="fitkinScanStop()">cancel</button></div>
+<div id="review">
+  <div class="chat-head">
+    <b>★ rate <span id="rvName">kin</span></b>
+    <button class="chat-act" onclick="fitkinReviewClose()" aria-label="close">✕</button>
+  </div>
+  <p class="dimtext" style="font-size:12.5px;margin-top:6px">only kin you've trained with. your review
+  goes live when they review you back, or in 14 days. bad experience? use report or block instead.</p>
+  <div id="rvStars" style="text-align:center;margin:14px 0 4px"></div>
+  <p class="opt-label" style="margin-top:12px">WHAT MADE IT GOOD</p>
+  <div class="fchips" id="rvTags" style="flex-wrap:wrap;overflow:visible"></div>
+  <p class="opt-label" style="margin-top:12px">THEIR LEVEL FELT LIKE (OPTIONAL)</p>
+  <div class="fchips" id="rvLevels"></div>
+  <p class="opt-label" style="margin-top:12px">A WORD FOR THEM (OPTIONAL)</p>
+  <input class="field" id="rvComment" maxlength="140" placeholder="great tempo, showed up early…">
+  <div class="cta"><button class="btn" id="rvSubmit" disabled onclick="fitkinReviewSubmit()">post review</button></div>
+</div>
 <div id="feed">
   <div class="chat-head">
     <b>👀 kin feed</b>
