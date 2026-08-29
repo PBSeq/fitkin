@@ -245,3 +245,8 @@ Codex 3차: 수리 5건 전원 OK, 전 파일 재스윕 신규 결함 0건 → *
 ### 13차 종결 — 🚀 Google Play 심사 진입 확인 (2026-08-27 아침)
 
 "Your changes are now in review" — 사전 검사 통과, v1.1(3) 심사 중. 이로써 **iOS(WAITING_FOR_REVIEW) + Android(IN REVIEW) 양대 스토어 동시 심사** 달성. 아이디어 발제(08/24)부터 3일.
+
+## 14차 — v1.2 킨 리뷰 시스템 구현·감사 종결 (2026-08-29)
+
+설계 LOCKED → 구현 → 규칙 실측 9/9(블라인드 read 403·stars<3 403·태그 403·위조 403·링크ts위조 403) → 이중 감사(Codex FAIL + Claude NG, 병합 9건: 삭제 파손 회귀 BLOCKER·rate 버튼 저장형 XSS BLOCKER·iOS public stale·update 타입 검증·리뷰 신고 이연 정합·인덱스 DESC·50+ 표기·N+1 완화·시계 마진) → 전건 수리 → **PASS-REVIEW-v2** → 웹 배포. 네이티브는 v1.2 빌드 대기.
++ 사고 기록: scratchpad 청소로 .git HEAD·일부 파일 소실 → logs/HEAD로 복구, git checkout으로 파일 복원, 커밋 유실 0. 교훈: scratchpad는 휘발성 — 푸시가 백업이다(기존 원칙 재확인).
