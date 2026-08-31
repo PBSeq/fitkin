@@ -45,7 +45,8 @@ const GH32 = "0123456789bcdefghjkmnpqrstuvwxyz";
 const CELL_RE = /^[0-9b-hjkmnp-z]{5}$/;
 const validCell = c => typeof c === "string" && CELL_RE.test(c);
 // 이웃 셀: cell4 중심을 디코드해 ±셀폭 오프셋 후 재인코드 — 인코더와 자동 정합,
-// 날짜변경선은 경도 랩, 극지방은 자연 축소. 셀 경계 바로 건너의 킨도 보이게.
+// 날짜변경선은 경도 랩, 극지방은 자연 축소. 5x5 이웃권 = 반경 약 40km(~25mi)
+// (박사님 지시 08-30: "10마일 정도, 더 넓게 가도 됨" — 콜드스타트엔 넓은 그물이 유리)
 function cellDecode4(c4) {
   let latR = [-90, 90], lonR = [-180, 180], even = true;
   for (const ch of c4) {
@@ -62,7 +63,7 @@ function cellDecode4(c4) {
 }
 function cellNeighborhood(c4) {
   const c = cellDecode4(c4), out = new Set();
-  for (const i of [-1, 0, 1]) for (const j of [-1, 0, 1]) {
+  for (const i of [-2, -1, 0, 1, 2]) for (const j of [-2, -1, 0, 1, 2]) {
     const lat = c.lat + i * c.dlat;
     if (lat <= -90 || lat >= 90) continue;         // 극 바깥 — 이웃 없음
     let lon = c.lon + j * c.dlon;
