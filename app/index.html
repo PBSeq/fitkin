@@ -7,7 +7,7 @@
 <meta name="description" content="find your fitness kin — workout people matched by neighborhood, schedule, level, and vibe.">
 <link rel="manifest" href="manifest.json">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet"
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet"
       media="print" onload="this.media='all'">
 <meta name="theme-color" content="#0c120e">
 <style>
@@ -74,7 +74,7 @@
   .seg{display:flex;background:var(--card);border:1.5px solid var(--line);
        border-radius:16px;padding:4px;gap:4px}
   .seg button{flex:1;border:0;background:none;border-radius:12px;padding:12px 6px;
-              font-family:inherit;font-size:14.5px;font-weight:650;color:var(--dim);cursor:pointer;transition:.15s}
+              font-family:inherit;font-size:14.5px;font-weight:600;color:var(--dim);cursor:pointer;transition:.15s}
   .seg button:active{transform:scale(.95)}
   .seg button.sel{background:var(--volt);color:#0c120e;box-shadow:0 2px 8px rgba(204,242,78,.28)}
 
@@ -91,7 +91,7 @@
        font-family:inherit;font-size:17.5px;font-weight:700;padding:17px;border-radius:99px;cursor:pointer;
        box-shadow:var(--press),var(--glow);transition:transform .1s,box-shadow .1s;
        position:relative;overflow:hidden}
-  .btn:not(:disabled)::after{content:"";position:absolute;top:0;bottom:0;width:46px;
+  .btn:not(:disabled)::after{content:"";position:absolute;top:0;bottom:0;left:-60px;width:46px;
        background:linear-gradient(105deg,transparent,rgba(255,255,255,.5),transparent);
        animation:shine 3.4s ease-in-out infinite}
   @keyframes shine{0%,72%{left:-60px}100%{left:calc(100% + 20px)}}
@@ -103,9 +103,9 @@
         border:1px solid var(--line);border-radius:var(--r);
         padding:20px 22px;margin:12px 0;box-shadow:var(--cardhi),0 10px 30px rgba(0,0,0,.28);
         animation:cardin .5s var(--spring) backwards}
-  .card:nth-of-type(2){animation-delay:.06s}
-  .card:nth-of-type(3){animation-delay:.12s}
-  .card:nth-of-type(4){animation-delay:.18s}
+  .card:nth-of-type(3){animation-delay:.06s}
+  .card:nth-of-type(4){animation-delay:.12s}
+  .card:nth-of-type(5){animation-delay:.18s}
   @keyframes cardin{from{opacity:0;transform:translateY(16px) scale(.985)}to{opacity:1;transform:none}}
   .me{display:flex;gap:14px;align-items:center}
   .ava{width:58px;height:58px;border-radius:19px;background:var(--card2);
@@ -117,7 +117,7 @@
   .me h3{font-size:18px;letter-spacing:-.3px}
   .me p{font-size:14px;color:var(--dim)}
   .tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
-  .tag{background:var(--card2);color:var(--mint);font-size:13px;font-weight:650;
+  .tag{background:var(--card2);color:var(--mint);font-size:13px;font-weight:600;
        border:1px solid var(--line);border-radius:99px;padding:4px 12px}
   .tags .tag:nth-child(3n+1){color:var(--volt);border-color:rgba(204,242,78,.25)}
   .tags .tag:nth-child(3n+3){color:#a9d5ff;border-color:rgba(169,213,255,.18)}
@@ -190,7 +190,7 @@
   .fchips{display:flex;gap:8px;overflow-x:auto;padding:10px 0 4px;flex:none;-webkit-overflow-scrolling:touch;scrollbar-width:none}
   .fchips::-webkit-scrollbar{display:none}
   .fchip{flex:none;border:1.5px solid var(--line);background:var(--card);border-radius:99px;
-         padding:8px 14px;font-family:inherit;font-size:14px;font-weight:650;color:var(--ink);cursor:pointer;
+         padding:11px 15px;min-height:44px;font-family:inherit;font-size:14px;font-weight:600;color:var(--ink);cursor:pointer;
          transition:transform .25s var(--spring),background .15s}
   .fchip:active{transform:scale(.9)}
   .fchip.sel{background:var(--volt);border-color:var(--volt);color:#0c120e;transform:scale(1.05)}
@@ -202,7 +202,7 @@
           font-family:inherit;transition:transform .3s var(--spring),color .15s}
   .rvstar:active{transform:scale(.8)}
   .rvstar.sel{color:var(--volt);text-shadow:0 0 18px rgba(204,242,78,.4);transform:scale(1.15) rotate(-8deg)}
-  .rvbadge{color:var(--volt);font-weight:650}
+  .rvbadge{color:var(--volt);font-weight:600}
   .moment{background:var(--card);border:1px solid var(--line);border-radius:var(--r);
           overflow:hidden;margin:12px 0}
   .moment img{width:100%;display:block;max-height:420px;object-fit:cover}
@@ -228,6 +228,7 @@
             min-height:44px;cursor:pointer;margin-right:4px}
   @media (prefers-reduced-motion:reduce){
     *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
+    .btn::after{display:none}
   }
 </style>
 </head>

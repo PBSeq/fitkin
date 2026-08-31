@@ -194,6 +194,7 @@ window.fitkinLogin = async function (kind) {
           put({ ...st(), id: cred.user.uid, name: d.name, sports: d.sports, vibe: d.vibe,
                 days: d.days, zip: d.zip, done: 1, published: Date.now(),
                 ...(validCell(d.cell) ? { cell: d.cell } : {}),
+                ...(d.hidden === true ? { hidden: true } : {}),
                 ...(typeof d.photo === "string" && d.photo.startsWith("data:image/jpeg;base64,")
                     ? { photoData: d.photo } : {}) });
           toast("welcome back, " + d.name + " ✓");
@@ -509,11 +510,12 @@ let feedTime = "";
 let feedMode = "people";
 window.fitkinFeedTab = function (mode) {
   feedMode = mode;
-  const tp = $("#ftabPeople"), tm = $("#ftabMoments"), sh = $("#fShare"), ch = $("#feedChips");
+  const tp = $("#ftabPeople"), tm = $("#ftabMoments"), sh = $("#fShare"), ch = $("#feedChips"), ch2 = $("#feedChips2");
   if (tp) tp.classList.toggle("sel", mode === "people");
   if (tm) tm.classList.toggle("sel", mode === "moments");
   if (sh) sh.style.display = mode === "moments" ? "" : "none";
   if (ch) ch.style.display = mode === "moments" ? "none" : "";
+  if (ch2) ch2.style.display = mode === "moments" ? "none" : "";
   paintFeed();
 };
 async function paintMoments() {
@@ -972,17 +974,17 @@ function paintSeek() {
   const row = $("#seekRow"); if (!row) return;
   const s = st();
   row.innerHTML = s.hidden
-    ? `you're <b>hidden</b> — no one new can find you. kin you already have keep you. ` +
-      `<a href="#" onclick="fitkinSeeking();return false" style="color:var(--mint)">list me again</a>`
-    : `you're <b>listed</b> — kin near you can find you. found your buddy? ` +
-      `<a href="#" onclick="fitkinSeeking();return false" style="color:var(--mint)">hide me</a>`;
+    ? `you're <b>hidden</b> — you won't appear in fitkin's lists. kin you already have keep you.` +
+      `<br><button class="scanbtn" onclick="fitkinSeeking()" style="margin-top:8px">👋 list me again</button>`
+    : `you're <b>listed</b> — kin near you can find you.` +
+      `<br><button class="scanbtn" onclick="fitkinSeeking()" style="margin-top:8px">🙈 found my buddy — hide me</button>`;
 }
 window.fitkinSeeking = async function () {
   const s = st();
   s.hidden = !s.hidden; s.published = 0; put(s);
   paintSeek();
   const ok = await window.fitkinPublish();
-  if (ok) toast(s.hidden ? "you're off the list 🙈 — come back anytime" : "you're back on the list 👋");
+  if (ok) toast(s.hidden ? "off the lists 🙈 — moments you shared stay until you delete them" : "you're back on the list 👋");
 };
 
 function toast(msg) {
