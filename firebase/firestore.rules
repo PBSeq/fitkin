@@ -18,17 +18,27 @@ service cloud.firestore {
       allow create, update: if request.auth != null
                     && request.auth.uid == uid
                     && notBanned()
-                    && request.resource.data.keys().hasOnly(['name','sports','vibe','days','zip','ts','photo'])
+                    && request.resource.data.keys().hasOnly(['name','sports','vibe','days','zip','ts','photo','cell','cell4','hidden'])
+                    && (!('hidden' in request.resource.data) || request.resource.data.hidden == true)
                     && (!('photo' in request.resource.data)
                         || (request.resource.data.photo is string
                             && request.resource.data.photo.size() <= 300000
                             && request.resource.data.photo.matches('^data:image/jpeg;base64,[A-Za-z0-9+/=]+$')))
-                    && request.resource.data.keys().hasAll(['name','sports','vibe','days','zip','ts'])
+                    && request.resource.data.keys().hasAll(['name','sports','vibe','days','ts'])
+                    && (('zip' in request.resource.data) || ('cell' in request.resource.data))
+                    && (('cell' in request.resource.data) == ('cell4' in request.resource.data))
+                    && (!('cell' in request.resource.data)
+                        || (request.resource.data.cell is string
+                            && request.resource.data.cell.matches('^[0-9b-hjkmnp-z]{5}$')
+                            && request.resource.data.cell4 is string
+                            && request.resource.data.cell4.matches('^[0-9b-hjkmnp-z]{4}$')
+                            && request.resource.data.cell.matches('^' + request.resource.data.cell4 + '.*')))
                     && request.resource.data.name is string
                     && request.resource.data.name.size() >= 1
                     && request.resource.data.name.size() <= 30
-                    && request.resource.data.zip is string
-                    && request.resource.data.zip.matches('^[0-9]{5}$')
+                    && (!('zip' in request.resource.data)
+                        || (request.resource.data.zip is string
+                            && request.resource.data.zip.matches('^[0-9]{5}$')))
                     && request.resource.data.sports is list
                     && request.resource.data.sports.size() >= 1
                     && request.resource.data.sports.size() <= 12
@@ -113,13 +123,22 @@ service cloud.firestore {
       allow read: if request.auth != null;   // 사진은 로그인(익명 포함) 사용자에게만 — 무인증 전수수집 차단
       allow create: if request.auth != null
                     && notBanned()
-                    && request.resource.data.keys().hasOnly(['owner','name','zip','img','caption','ts'])
+                    && request.resource.data.keys().hasOnly(['owner','name','zip','cell','cell4','img','caption','ts'])
                     && request.resource.data.owner == request.auth.uid
                     && exists(/databases/$(database)/documents/profiles/$(request.auth.uid))
                     && request.resource.data.name is string
                     && request.resource.data.name.size() <= 30
-                    && request.resource.data.zip is string
-                    && request.resource.data.zip.matches('^[0-9]{5}$')
+                    && (('zip' in request.resource.data) || ('cell' in request.resource.data))
+                    && (!('zip' in request.resource.data)
+                        || (request.resource.data.zip is string
+                            && request.resource.data.zip.matches('^[0-9]{5}$')))
+                    && (('cell' in request.resource.data) == ('cell4' in request.resource.data))
+                    && (!('cell' in request.resource.data)
+                        || (request.resource.data.cell is string
+                            && request.resource.data.cell.matches('^[0-9b-hjkmnp-z]{5}$')
+                            && request.resource.data.cell4 is string
+                            && request.resource.data.cell4.matches('^[0-9b-hjkmnp-z]{4}$')
+                            && request.resource.data.cell.matches('^' + request.resource.data.cell4 + '.*')))
                     && request.resource.data.img is string
                     && request.resource.data.img.size() <= 700000
                     && request.resource.data.img.matches('^data:image/jpeg;base64,[A-Za-z0-9+/=]+$')
@@ -199,9 +218,9 @@ service cloud.firestore {
                     && request.resource.data.levelCheck in ['','new-ish','steady','serious']
                     && request.resource.data.visibleAfter >= resource.data.ts
                     && request.resource.data.visibleAfter <= resource.data.ts + 1209600000;
-      // from(작성자 삭제) 또는 to(계정 삭제 시 받은 리뷰 청산 — 별점 3~5뿐이라 삭제 악용 실익 없음)
+      // 작성자만 삭제. 수신 리뷰 청산은 관리자 경로(moderate.py cleanorphans) — 클라 권한 최소화
       allow delete: if request.auth != null
-                    && (resource.data.from == request.auth.uid || resource.data.to == request.auth.uid);
+                    && resource.data.from == request.auth.uid;
     }
 
     // 신고: 인앱 제출(본인 명의만). 열람은 운영자(관리 토큰)만 — 클라이언트 read 금지.

@@ -1,6 +1,6 @@
-// fitkin v1.1 — 익명인증(uid) + ZIP 매칭·추천 + 킨 메시지.
-// 프라이버시 원칙 유지: GPS 없음. 이용자가 적는 5자리 ZIP 만.
-// "근처" = ZIP 앞 3자리(우편 권역) 일치 — 지도 데이터 $0.
+// fitkin v1.2 — 익명인증(uid) + 지역 매칭(미국 ZIP 또는 글로벌 ~5km 셀) + 킨 메시지.
+// 프라이버시 원칙: 정밀 좌표는 기기 밖으로 안 나간다 — 위치를 쓰면 기기에서
+// geohash5(~4.9km) 셀로 변환해 셀 ID만 저장. ZIP "근처" = 앞 3자리, 셀 "근처" = 3x3 이웃권.
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { initializeAuth, indexedDBLocalPersistence, browserLocalPersistence,
          browserPopupRedirectResolver, signInAnonymously, onAuthStateChanged,
@@ -41,6 +41,72 @@ const ready = Promise.race([authP, new Promise(r => setTimeout(() => r(null), 80
 // XSS 방어: 모든 유저 입력 필드는 이스케이프 후에만 innerHTML 에 들어간다
 const esc = v => String(v ?? "").replace(/[&<>"']/g,
   c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+// ── 글로벌 그리드 (v1.2): 좌표→geohash5 셀(≈4.9km). 좌표는 기기에서 즉시 폐기,
+//    셀 ID만 저장 — "정밀 위치 미저장" 원칙 유지. ZIP(미국)과 공존한다.
+const GH32 = "0123456789bcdefghjkmnpqrstuvwxyz";
+const CELL_RE = /^[0-9b-hjkmnp-z]{5}$/;
+const validCell = c => typeof c === "string" && CELL_RE.test(c);
+// 이웃 셀: cell4 중심을 디코드해 ±셀폭 오프셋 후 재인코드 — 인코더와 자동 정합,
+// 날짜변경선은 경도 랩, 극지방은 자연 축소. 셀 경계 바로 건너의 킨도 보이게.
+function cellDecode4(c4) {
+  let latR = [-90, 90], lonR = [-180, 180], even = true;
+  for (const ch of c4) {
+    const ci = GH32.indexOf(ch);
+    for (let b = 4; b >= 0; b--) {
+      const bit = (ci >> b) & 1;
+      if (even) { const m = (lonR[0] + lonR[1]) / 2; if (bit) lonR[0] = m; else lonR[1] = m; }
+      else { const m = (latR[0] + latR[1]) / 2; if (bit) latR[0] = m; else latR[1] = m; }
+      even = !even;
+    }
+  }
+  return { lat: (latR[0] + latR[1]) / 2, lon: (lonR[0] + lonR[1]) / 2,
+           dlat: latR[1] - latR[0], dlon: lonR[1] - lonR[0] };
+}
+function cellNeighborhood(c4) {
+  const c = cellDecode4(c4), out = new Set();
+  for (const i of [-1, 0, 1]) for (const j of [-1, 0, 1]) {
+    const lat = c.lat + i * c.dlat;
+    if (lat <= -90 || lat >= 90) continue;         // 극 바깥 — 이웃 없음
+    let lon = c.lon + j * c.dlon;
+    if (lon >= 180) lon -= 360; if (lon < -180) lon += 360;   // 날짜변경선 랩
+    out.add(geohash5(lat, lon).slice(0, 4));
+  }
+  return [...out];
+}
+function geohash5(lat, lon) {
+  let latR = [-90, 90], lonR = [-180, 180], bit = 0, ch = 0, even = true, out = "";
+  while (out.length < 5) {
+    if (even) { const m = (lonR[0] + lonR[1]) / 2;
+      if (lon >= m) { ch = ch * 2 + 1; lonR[0] = m; } else { ch *= 2; lonR[1] = m; } }
+    else { const m = (latR[0] + latR[1]) / 2;
+      if (lat >= m) { ch = ch * 2 + 1; latR[0] = m; } else { ch *= 2; latR[1] = m; } }
+    even = !even;
+    if (++bit === 5) { out += GH32[ch]; bit = 0; ch = 0; }
+  }
+  return out;
+}
+// 위치 1회 요청 → 셀 저장 → 재발행. 좌표는 이 함수 스코프 밖으로 나가지 않는다.
+window.fitkinUseLocation = function (travel) {
+  if (!navigator.geolocation) { toast("location isn't available on this device — type your ZIP instead"); return; }
+  toast("finding your area…");
+  navigator.geolocation.getCurrentPosition(async pos => {
+    const cell = geohash5(pos.coords.latitude, pos.coords.longitude);
+    const s = st();
+    if (travel) {
+      if (s.homeZip === undefined) s.homeZip = s.zip || "";
+      if (s.homeCell === undefined) s.homeCell = s.cell || "";
+    }
+    if (travel) s.zip = "";           // 출장 지역에선 홈 ZIP 매칭이 새면 안 된다
+    s.cell = cell; s.published = 0; put(s);
+    const zipEl = document.getElementById("fZip");
+    if (zipEl) { zipEl.placeholder = "area set \u2713 \u2014 or type a US ZIP"; zipEl.dispatchEvent(new Event("input")); }
+    toast("area set \u2713 \u2014 we only keep a rough ~5km area, never your exact spot");
+    if (s.done) { const ok = await window.fitkinPublish(); if (ok) paintDiscover(); }
+  }, err => {
+    toast(err.code === 1 ? "no worries — type your ZIP instead" : "couldn't get your location — type your ZIP instead");
+  }, { enableHighAccuracy: false, timeout: 10000, maximumAge: 600000 });
+};
 
 // ── 소셜 로그인 — 네이티브(iOS)는 SocialLogin 플러그인→signInWithCredential,
 //    웹은 signInWithPopup. 애플 심사규정 4.8: 구글을 켜면 애플 로그인도 의무.
@@ -127,6 +193,7 @@ window.fitkinLogin = async function (kind) {
           const d = snap.data();
           put({ ...st(), id: cred.user.uid, name: d.name, sports: d.sports, vibe: d.vibe,
                 days: d.days, zip: d.zip, done: 1, published: Date.now(),
+                ...(validCell(d.cell) ? { cell: d.cell } : {}),
                 ...(typeof d.photo === "string" && d.photo.startsWith("data:image/jpeg;base64,")
                     ? { photoData: d.photo } : {}) });
           toast("welcome back, " + d.name + " ✓");
@@ -185,7 +252,8 @@ function paintAcct() {
 // UID 없이는 절대 쓰지 않는다 (profiles/null 방지). auth 회복 시 자동 재시도.
 window.fitkinPublish = async function () {
   const s = st();
-  if (!s.name || !/^[0-9]{5}$/.test(s.zip || "")) return;
+  if (s.cell && !validCell(s.cell)) { delete s.cell; put(s); }   // 불량 셀 자가치유
+  if (!s.name || (!/^[0-9]{5}$/.test(s.zip || "") && !validCell(s.cell))) return;
   await ready;
   if (!UID) {
     toast("offline — your card is saved on this phone and will publish when you're back");
@@ -196,8 +264,11 @@ window.fitkinPublish = async function () {
     s.id = UID; put(s);
     const payload = {
       name: s.name.slice(0, 30), sports: s.sports, vibe: s.vibe, days: s.days,
-      zip: s.zip, ts: Date.now(),
+      ts: Date.now(),
     };
+    if (/^[0-9]{5}$/.test(s.zip || "")) payload.zip = s.zip;
+    if (validCell(s.cell)) { payload.cell = s.cell; payload.cell4 = s.cell.slice(0, 4); }
+    if (s.hidden) payload.hidden = true;
     if (s.photoData) payload.photo = s.photoData;
     await setDoc(doc(db, "profiles", UID), payload);
     s.published = Date.now(); put(s);
@@ -216,13 +287,27 @@ function overlap(mine, theirs) {
 
 // ── 추천: 같은 ZIP(hood) + 앞3자리(nearby) ──
 async function discover() {
-  const s = st(); if (!s.zip) return { hood: [], near: [] };
-  const p3 = s.zip.slice(0, 3);
-  const [qz, qn] = await Promise.all([
-    getDocs(query(collection(db, "profiles"), where("zip", "==", s.zip), limit(40))),
-    getDocs(query(collection(db, "profiles"), orderBy("zip"),
-                  where("zip", ">=", p3 + "00"), where("zip", "<=", p3 + "99"), limit(60))),
-  ]);
+  const s = st(); if (!s.zip && !validCell(s.cell)) return { hood: [], near: [] };
+  const jobs = [];
+  if (s.zip) {
+    const p3 = s.zip.slice(0, 3);
+    jobs.push(getDocs(query(collection(db, "profiles"), where("zip", "==", s.zip), limit(40))));
+    jobs.push(getDocs(query(collection(db, "profiles"), orderBy("zip"),
+      where("zip", ">=", p3 + "00"), where("zip", "<=", p3 + "99"), limit(60))));
+  }
+  if (validCell(s.cell)) {
+    jobs.push(getDocs(query(collection(db, "profiles"), where("cell", "==", s.cell), limit(40))));
+    jobs.push(getDocs(query(collection(db, "profiles"),
+      where("cell4", "in", cellNeighborhood(s.cell.slice(0, 4))), limit(60))));
+  }
+  const res = await Promise.all(jobs);
+  // [hood 쿼리들, nearby 쿼리들] 순서로 병합
+  const hoodQs = [], nearQs = [];
+  let i = 0;
+  if (s.zip) { hoodQs.push(res[i++]); nearQs.push(res[i++]); }
+  if (validCell(s.cell)) { hoodQs.push(res[i++]); nearQs.push(res[i++]); }
+  const qz = { forEach: cb => hoodQs.forEach(q => q.forEach(cb)) };
+  const qn = { forEach: cb => nearQs.forEach(q => q.forEach(cb)) };
   // 내가 차단한 사람은 추천에서도 숨긴다 (Apple 1.2)
   const blocked = await myBlocks();
   const seen = new Set([UID, ...blocked]);
@@ -238,12 +323,13 @@ async function discover() {
     return -sc;
   };
   const safeRank = p => { try { return rank(p); } catch (e) { return 0; } };   // 조작 프로필 1건이 전체 추천을 죽이지 못하게
-  const take = (qs, excludeZip) => {
+  const take = (qs, excludeHood) => {
     const out = [];
     qs.forEach(d => {
       const p = d.data();
       if (seen.has(d.id)) return;
-      if (excludeZip && p.zip === s.zip) return;
+      if (p.hidden) return;   // "그만 찾기" 상태 — 리스트업에서 내려간다 (킨 링크·채팅은 유지)
+      if (excludeHood && ((s.zip && p.zip === s.zip) || (s.cell && p.cell === s.cell))) return;
       if (typeof p.name !== "string" || !Array.isArray(p.sports)) return;
       seen.add(d.id); out.push({ id: d.id, ...p });
     });
@@ -268,8 +354,8 @@ function personRow(k, mine) {
   const av = (typeof k.photo === "string" && k.photo.startsWith("data:image/jpeg;base64,"))
     ? `<img src="${esc(k.photo)}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:12px">`
     : `<img src="${avatarSvg(k.name, 80)}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:12px">`;
-  // 프라이버시: 정밀 ZIP5 는 매칭에만 쓰고, 화면엔 권역(ZIP3xx)만 보여준다
-  const area = (k.zip || "").slice(0, 3) + "xx";
+  // 프라이버시: 정밀 ZIP5/cell5 는 매칭에만, 화면엔 성긴 권역만
+  const area = k.zip ? k.zip.slice(0, 3) + "xx" : (k.cell ? "area " + k.cell.slice(0, 4) : "nearby");
   return `<div class="kinrow" data-kin="${esc(k.id)}" data-name="${esc(k.name)}">
     <span class="kava">${av}</span>
     <div style="flex:1"><b>${esc(k.name)}</b><p>${shared.length
@@ -284,12 +370,12 @@ async function paintDiscover() {
     const { hood, near } = await discover();
     const rows = [
       ...hood.map(k => personRow(k, s.sports)),
-      ...(near.length ? [`<p class="dimtext" style="margin:10px 0 4px">nearby (${s.zip.slice(0,3)}xx)</p>`] : []),
+      ...(near.length ? [`<p class="dimtext" style="margin:10px 0 4px">nearby (${s.zip ? s.zip.slice(0,3) + "xx" : "your area"})</p>`] : []),
       ...near.slice(0, 10).map(k => personRow(k, s.sports)),
     ];
     wrap.innerHTML = rows.length
       ? rows.join("") + `<p class="dimtext" style="margin-top:10px">see someone at the gym? scan their kin code to connect.</p>`
-      : `<p class="dimtext">no one in ${s.zip} yet — you're first. share fitkin with your crew.</p>`;
+      : `<p class="dimtext">no one around here yet — you're first. share fitkin with your crew.</p>`;
     decorateRows(wrap);
   } catch (e) { wrap.innerHTML = `<p class="dimtext">couldn't load nearby kin — check connection.</p>`; }
 }
@@ -374,7 +460,10 @@ window.fitkinSetPhoto = async function () {
 };
 window.fitkinMoment = async function () {
   const s = st();
+  if (s.cell && !validCell(s.cell)) { delete s.cell; put(s); }   // 불량 셀 자가치유
   if (!s.published) { toast("build your kin card first"); return; }
+  if (!/^[0-9]{5}$/.test(s.zip || "") && !validCell(s.cell)) {
+    toast("set your area first — type a zip or tap 📍 use my location"); return; }
   const c = await pickImage(800, false);
   if (!c) return;
   toast("checking photo — first time can take a moment…");
@@ -386,8 +475,10 @@ window.fitkinMoment = async function () {
   await ready;
   if (!UID) { toast("you're offline — try again when you're back"); return; }
   try {
-    await addDoc(collection(db, "photos"),
-      { owner: UID, name: (s.name || "").slice(0, 30), zip: s.zip, img: url, caption, ts: Date.now() });
+    const ph = { owner: UID, name: (s.name || "").slice(0, 30), img: url, caption, ts: Date.now() };
+    if (/^[0-9]{5}$/.test(s.zip || "")) ph.zip = s.zip;
+    if (validCell(s.cell)) { ph.cell = s.cell; ph.cell4 = s.cell.slice(0, 4); }
+    await addDoc(collection(db, "photos"), ph);
     toast("moment shared 📸");
     paintFeed();
   } catch (e) { toast("couldn't share — try again"); }
@@ -413,6 +504,8 @@ window.fitkinDeletePhoto = async function (id) {
 const FEED_SPORTS = ["running", "lifting", "tennis", "swimming", "cycling",
                      "hiking", "yoga", "hoops", "soccer", "pickleball", "boxing", "climbing"];
 let feedSport = "";
+let feedLevel = "";
+let feedTime = "";
 let feedMode = "people";
 window.fitkinFeedTab = function (mode) {
   feedMode = mode;
@@ -426,13 +519,23 @@ window.fitkinFeedTab = function (mode) {
 async function paintMoments() {
   const s = st();
   const sub = $("#feedSub");
-  if (sub) sub.textContent = `workout moments around ${(s.zip || "").slice(0, 3)}xx — kin sharing the grind.`;
+  if (sub) sub.textContent = `workout moments around ${s.zip ? s.zip.slice(0, 3) + "xx" : "your area"} — kin sharing the grind.`;
   const wrap = $("#feedList"); if (!wrap) return;
   try {
     await ready;
-    const p3 = (s.zip || "").slice(0, 3);
-    const qs = await getDocs(query(collection(db, "photos"), orderBy("zip"),
-      where("zip", ">=", p3 + "00"), where("zip", "<=", p3 + "99"), limit(30)));
+    const jobs = [];
+    if (s.zip) {
+      const p3 = s.zip.slice(0, 3);
+      jobs.push(getDocs(query(collection(db, "photos"), orderBy("zip"),
+        where("zip", ">=", p3 + "00"), where("zip", "<=", p3 + "99"), limit(30))));
+    }
+    if (validCell(s.cell)) {
+      jobs.push(getDocs(query(collection(db, "photos"),
+        where("cell4", "in", cellNeighborhood(s.cell.slice(0, 4))), limit(30))));
+    }
+    const res = await Promise.all(jobs);
+    const qs = { forEach: cb => { const ids = new Set();
+      res.forEach(q => q.forEach(d => { if (!ids.has(d.id)) { ids.add(d.id); cb(d); } })); } };
     const blocked = await myBlocks();   // Set
     const items = [];
     qs.forEach(d => {
@@ -446,7 +549,7 @@ async function paintMoments() {
       ? items.map(m => `<div class="moment">
           <img src="${esc(m.img)}" alt="">
           <div class="moment-meta">
-            <b>${esc(m.name)}</b> · ${esc((m.zip || "").slice(0, 3))}xx
+            <b>${esc(m.name)}</b> · ${esc(m.zip ? m.zip.slice(0, 3) + "xx" : "your area")}
             ${m.caption ? " · " + esc(m.caption) : ""}
             <span style="margin-left:auto;display:flex;gap:10px">
               ${m.owner === UID
@@ -454,7 +557,7 @@ async function paintMoments() {
                 : `<a href="#" onclick="fitkinReportPhoto('${esc(m.id)}');return false" style="color:var(--mint)">report</a>`}
             </span>
           </div></div>`).join("")
-      : `<p class="dimtext" style="margin-top:14px">no moments around ${esc(s.zip)} yet —
+      : `<p class="dimtext" style="margin-top:14px">no moments around here yet —
          be the first: tap <b>+ share</b> after a workout with your kin. 📸</p>`;
   } catch (e) { wrap.innerHTML = `<p class="dimtext">couldn't load moments — check connection.</p>`; }
 }
@@ -472,6 +575,8 @@ window.fitkinFeed = function () {
 };
 window.fitkinFeedClose = function () { $("#feed").classList.remove("on"); };
 window.fitkinFeedFilter = function (sp) { feedSport = sp === feedSport ? "" : sp; paintFeed(); };
+window.fitkinFeedLevel = function (lv) { feedLevel = lv === feedLevel ? "" : lv; paintFeed(); };
+window.fitkinFeedTime = function (t) { feedTime = t === feedTime ? "" : t; paintFeed(); };
 async function paintFeed() {
   if (feedMode === "moments") return paintMoments();
   const s = st();
@@ -480,23 +585,33 @@ async function paintFeed() {
     [`<button class="fchip${feedSport ? "" : " sel"}" onclick="fitkinFeedFilter('')">all</button>`,
      ...FEED_SPORTS.map(sp =>
        `<button class="fchip${feedSport === sp ? " sel" : ""}" onclick="fitkinFeedFilter('${sp}')">${esc(sp)}</button>`)].join("");
+  const chips2 = $("#feedChips2");
+  if (chips2) chips2.innerHTML =
+    [...["new-ish", "steady", "serious"].map(lv =>
+       `<button class="fchip${feedLevel === lv ? " sel" : ""}" onclick="fitkinFeedLevel('${lv}')">${esc(lv)}</button>`),
+     ...[["🌅 mornings", "🌅"], ["☀️ daytime", "☀️"], ["🌙 nights", "🌙"]].map(([t, ico]) =>
+       `<button class="fchip${feedTime === t ? " sel" : ""}" onclick="fitkinFeedTime('${t}')">${ico} ${esc(t.split(" ")[1])}</button>`)].join("");
   const sub = $("#feedSub");
-  if (sub) sub.textContent = `kin in ${s.zip} and nearby (${(s.zip || "").slice(0, 3)}xx) — tap a sport to filter.`;
+  if (sub) sub.textContent = s.zip
+    ? `kin in ${s.zip} and nearby (${s.zip.slice(0, 3)}xx) — tap a sport to filter.`
+    : `kin in and around your area — tap a sport to filter.`;
   const wrap = $("#feedList"); if (!wrap) return;
   try {
     const { hood, near } = await discover();
-    const flt = k => !feedSport || (k.sports || []).includes(feedSport);
+    const flt = k => (!feedSport || (k.sports || []).includes(feedSport))
+      && (!feedLevel || ((k.vibe || {}).level || "").trim() === feedLevel)
+      && (!feedTime || (k.vibe || {}).time === feedTime);
     const h = hood.filter(flt), n = near.filter(flt);
     const rows = [
       ...h.map(k => personRow(k, s.sports)),
-      ...(n.length ? [`<p class="dimtext" style="margin:10px 0 4px">nearby (${s.zip.slice(0, 3)}xx)</p>`] : []),
+      ...(n.length ? [`<p class="dimtext" style="margin:10px 0 4px">nearby (${s.zip ? s.zip.slice(0, 3) + "xx" : "your area"})</p>`] : []),
       ...n.map(k => personRow(k, s.sports)),
     ];
     wrap.innerHTML = rows.length
       ? rows.join("")
       : `<p class="dimtext">${feedSport
-          ? `no ${esc(feedSport)} kin around ${esc(s.zip)} yet — clear the filter or share fitkin with your crew.`
-          : `no one around ${esc(s.zip)} yet — you're first. share fitkin with your crew.`}</p>`;
+          ? `no ${esc(feedSport)} kin around here yet — clear the filter or share fitkin with your crew.`
+          : `no one around here yet — you're first. share fitkin with your crew.`}</p>`;
     if (rows.length) decorateRows(wrap);
   } catch (e) { wrap.innerHTML = `<p class="dimtext">couldn't load the feed — check connection.</p>`; }
 }
@@ -846,10 +961,29 @@ async function paintHome() {
   // 발행이 안 된 카드가 있으면 홈에 올 때 1회 자동 재시도 (약속 이행)
   if (!s.published && !pubRetried) { pubRetried = true; window.fitkinPublish(); return; }
   window.fitkinDrawQR();
+  paintSeek();
   paintKin();
   paintDiscover();
   if (s.pendingKin) { const p = s.pendingKin; delete s.pendingKin; put(s); location.hash = "#kin=" + p; handleKinLink(); }
 }
+
+// ── 버디 찾기 노출 토글: 프로필을 지우지 않고 리스트에서만 내린다/올린다 ──
+function paintSeek() {
+  const row = $("#seekRow"); if (!row) return;
+  const s = st();
+  row.innerHTML = s.hidden
+    ? `you're <b>hidden</b> — no one new can find you. kin you already have keep you. ` +
+      `<a href="#" onclick="fitkinSeeking();return false" style="color:var(--mint)">list me again</a>`
+    : `you're <b>listed</b> — kin near you can find you. found your buddy? ` +
+      `<a href="#" onclick="fitkinSeeking();return false" style="color:var(--mint)">hide me</a>`;
+}
+window.fitkinSeeking = async function () {
+  const s = st();
+  s.hidden = !s.hidden; s.published = 0; put(s);
+  paintSeek();
+  const ok = await window.fitkinPublish();
+  if (ok) toast(s.hidden ? "you're off the list 🙈 — come back anytime" : "you're back on the list 👋");
+};
 
 function toast(msg) {
   let t = $("#toast");
@@ -861,11 +995,14 @@ function toast(msg) {
 // ── 출장 모드: 현재 지역 빠른 전환 (온보딩 재주행 없이) ──
 window.fitkinArea = async function () {
   const s = st();
-  const z = prompt("traveling? set your current zip (5 digits).\nyou'll see kin there and they'll see you.", s.zip || "");
+  const z = prompt("traveling? type your current zip (5 digits) —\nor leave it empty to use your current location\n(we only keep a rough ~5km area, never your exact spot).", s.zip || "");
   if (z === null) return;
+  if (z.trim() === "") { window.fitkinUseLocation(true); return; }
   if (!/^[0-9]{5}$/.test(z.trim())) { toast("that's not a 5-digit zip"); return; }
-  s.homeZip = s.homeZip || s.zip;   // 첫 전환 때 홈 존 기억
-  s.zip = z.trim(); s.published = 0; put(s);   // 재시도 기계 재장전
+  if (s.homeZip === undefined) s.homeZip = s.zip || "";
+  if (s.homeCell === undefined) s.homeCell = s.cell || "";
+  s.zip = z.trim(); delete s.cell;   // 출장 ZIP 존에선 홈 셀 매칭이 새면 안 된다
+  s.published = 0; put(s);   // 재시도 기계 재장전
   const ok = await window.fitkinPublish();
   if (ok) {
     toast(s.zip === s.homeZip ? "back home 🏠" : "now finding kin in " + s.zip + " ✈️");
@@ -875,15 +1012,17 @@ window.fitkinArea = async function () {
 };
 window.fitkinAreaHome = async function () {
   const s = st();
-  if (!s.homeZip || s.homeZip === s.zip) { toast("you're already home 🏠"); return; }
-  s.zip = s.homeZip; s.published = 0; put(s);
+  if (s.homeZip === undefined || (s.homeZip === (s.zip || "") && (s.homeCell || "") === (s.cell || ""))) { toast("you're already home 🏠"); return; }
+  s.zip = s.homeZip; if (s.homeCell) s.cell = s.homeCell; else delete s.cell;
+  delete s.homeZip; delete s.homeCell;
+  s.published = 0; put(s);
   const ok = await window.fitkinPublish();
   if (ok) { toast("back home 🏠"); paintDiscover(); }
 };
 
 // ── 프로필 완전 삭제 (privacy 약속 이행: 서버 데이터까지 지운다) ──
 window.fitkinDelete = async function () {
-  if (!confirm("delete your account everywhere? this removes your card, your photos, and your sign-in from fitkin's servers and this phone.")) return;
+  if (!confirm("delete your account everywhere? this removes your card, your photos, reviews you wrote, and your sign-in from fitkin's servers and this phone. messages you sent in chats may remain on your kin's side.")) return;
   try {
     await ready;
     // 오프라인이면 삭제를 가장하지 않는다 — 서버까지 지울 수 있을 때만 "deleted"
