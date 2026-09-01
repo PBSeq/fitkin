@@ -47,7 +47,7 @@ service cloud.firestore {
                     && request.resource.data.vibe is map
                     && request.resource.data.vibe.keys().hasOnly(['time','mode','level'])
                     && (!('time' in request.resource.data.vibe)
-                        || (request.resource.data.vibe.time is string && request.resource.data.vibe.time.size() <= 20))
+                        || (request.resource.data.vibe.time is string && request.resource.data.vibe.time.size() <= 60))   // size()=코드포인트. 다중선택 3개 조인=34cp — 카피 변경 여유
                     && (!('mode' in request.resource.data.vibe)
                         || (request.resource.data.vibe.mode is string && request.resource.data.vibe.mode.size() <= 20))
                     && (!('level' in request.resource.data.vibe)

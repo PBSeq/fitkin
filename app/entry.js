@@ -96,7 +96,7 @@ window.fitkinUseLocation = function (travel) {
       if (s.homeCell === undefined) s.homeCell = s.cell || "";
     }
     if (travel) s.zip = "";           // 출장 지역에선 홈 ZIP 매칭이 새면 안 된다
-    s.cell = cell; s.published = 0; put(s);
+    s.cell = cell; s.published = 0; delete s.areaName; delete s.areaKey; put(s);
     const zipEl = document.getElementById("fZip");
     if (zipEl) { zipEl.placeholder = "area set \u2713 \u2014 or type a US ZIP"; zipEl.dispatchEvent(new Event("input")); }
     toast("area set \u2713 \u2014 we only keep a rough ~5km area, never your exact spot");
@@ -311,7 +311,7 @@ async function discover() {
     let sc = overlap(s.sports, p.sports).length * 2;
     sc += Math.min(2, (s.days || []).filter(d => (p.days || []).includes(d)).length * 0.4);
     const v = s.vibe || {}, w = p.vibe || {};
-    if (v.time && v.time === w.time) sc += 1;
+    if (v.time && w.time && v.time.split(" + ").some(t => w.time.split(" + ").includes(t))) sc += 1;
     if (v.mode && v.mode === w.mode) sc += 1;
     if (v.level && w.level) sc += 1 - Math.min(1, Math.abs(LV.indexOf(v.level.trim()) - LV.indexOf(w.level.trim())) * 0.5);
     return -sc;
@@ -594,7 +594,7 @@ async function paintFeed() {
     const { hood, near } = await discover();
     const flt = k => (!feedSport || (k.sports || []).includes(feedSport))
       && (!feedLevel || ((k.vibe || {}).level || "").trim() === feedLevel)
-      && (!feedTime || (k.vibe || {}).time === feedTime);
+      && (!feedTime || ((k.vibe || {}).time || "").split(" + ").includes(feedTime));
     const h = hood.filter(flt), n = near.filter(flt);
     const rows = [
       ...h.map(k => personRow(k, s.sports)),
@@ -618,13 +618,31 @@ function kinUrl(id) {
   const onWeb = location.protocol.startsWith("http") && !["localhost", "127.0.0.1"].includes(location.hostname);
   return (onWeb ? location.origin + location.pathname : WEB_APP_URL) + "#kin=" + id;
 }
+const SPORT_EMOJI = { running:"🏃", lifting:"🏋️", tennis:"🎾", swimming:"🏊", cycling:"🚴",
+  hiking:"🥾", yoga:"🧘", hoops:"🏀", soccer:"⚽", pickleball:"🏓", boxing:"🥊", climbing:"🧗" };
+function kinSvg(id, cellSize) {
+  const q = qrcode(0, "M"); q.addData(kinUrl(id)); q.make();
+  return q.createSvgTag({ cellSize: cellSize, margin: 2 });
+}
 window.fitkinDrawQR = function () {
   const s = st(); if (!s.id) return;
   const box = $("#qrCanvas"); if (!box || !window.qrcode) return;
-  const q = qrcode(0, "M"); q.addData(kinUrl(s.id)); q.make();
-  box.innerHTML = q.createSvgTag({ cellSize: 3, margin: 2 });
-  const svg = box.querySelector("svg");
-  svg.style.width = "100%"; svg.style.height = "100%"; svg.style.borderRadius = "12px";
+  // 종목별 카드 하나씩 — 같은 킨 링크, 보여줄 종목만 다르게 (엔지니어 피드백 #4)
+  const sports = (s.sports && s.sports.length ? s.sports : ["fitkin"]);
+  box.innerHTML = sports.map(sp => `<div class="qslide" data-sport="${esc(sp)}">
+      <div class="qbox">${kinSvg(s.id, 3)}</div>
+      <div class="qlabel">${SPORT_EMOJI[sp] || "💪"} ${esc(sp)}</div>
+    </div>`).join("");
+  if (!box.dataset.wired) {
+    box.dataset.wired = 1;
+    box.addEventListener("click", e => {
+      const sl = e.target.closest(".qslide"); if (!sl) return;
+      const sp = sl.dataset.sport, s2 = st();
+      $("#qzLabel").textContent = (SPORT_EMOJI[sp] || "💪") + " " + sp;
+      $("#qzBox").innerHTML = kinSvg(s2.id, 8);      // 탭하면 대형 — 스캔 잘 되게 (피드백 #2)
+      $("#qrZoom").classList.add("on");
+    });
+  }
 };
 
 // ── 스캐너 ──
@@ -954,9 +972,44 @@ async function paintHome() {
   if (!s.published && !pubRetried) { pubRetried = true; window.fitkinPublish(); return; }
   window.fitkinDrawQR();
   paintSeek();
+  resolveAreaName();
   paintKin();
   paintDiscover();
   if (s.pendingKin) { const p = s.pendingKin; delete s.pendingKin; put(s); location.hash = "#kin=" + p; handleKinLink(); }
+}
+
+// ── 현재 지역 이름: ZIP→도시(zippopotam), 셀→도시(성긴 셀 중심만 질의 — 정밀 좌표 비전송) ──
+async function resolveAreaName() {
+  const s = st();
+  const key = s.zip || s.cell || "";
+  if (!key) { const el = $("#areaRow"); if (el) el.textContent = ""; return; }
+  if (s.areaKey === key && s.areaName) { paintArea(); return; }
+  let name = "";
+  try {
+    if (s.zip) {
+      const r = await fetch("https://api.zippopotam.us/us/" + s.zip);
+      if (r.ok) { const j = await r.json();
+        const p = (j.places || [])[0] || {};
+        name = [p["place name"], p["state abbreviation"]].filter(Boolean).join(", "); }
+    } else if (validCell(s.cell)) {
+      const c = cellDecode4(s.cell.slice(0, 4));   // 성긴 셀 중심 — 실제 좌표 아님
+      const r = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${c.lat}&longitude=${c.lon}&localityLanguage=en`);
+      if (r.ok) { const j = await r.json();
+        name = [j.city || j.locality, j.principalSubdivisionCode ? j.principalSubdivisionCode.split("-").pop() : ""].filter(Boolean).join(", "); }
+    }
+  } catch (e) {}
+  const s2 = st();
+  if ((s2.zip || s2.cell || "") !== key) return;   // 조회 중 지역이 바뀌었으면 낡은 응답 폐기
+  s2.areaName = name; s2.areaKey = key; put(s2);
+  paintArea();
+}
+function paintArea() {
+  const el = $("#areaRow"); if (!el) return;
+  const s = st();
+  const where = s.zip
+    ? (s.areaName ? `${s.areaName} · ${s.zip}` : s.zip)
+    : (validCell(s.cell) ? (s.areaName ? `near ${s.areaName}` : "your area (~5km)") : "");
+  el.textContent = where ? "📍 " + where : "";
 }
 
 // ── 버디 찾기 노출 토글: 프로필을 지우지 않고 리스트에서만 내린다/올린다 ──
@@ -993,7 +1046,7 @@ window.fitkinArea = async function () {
   if (!/^[0-9]{5}$/.test(z.trim())) { toast("that's not a 5-digit zip"); return; }
   if (s.homeZip === undefined) s.homeZip = s.zip || "";
   if (s.homeCell === undefined) s.homeCell = s.cell || "";
-  s.zip = z.trim(); delete s.cell;   // 출장 ZIP 존에선 홈 셀 매칭이 새면 안 된다
+  s.zip = z.trim(); delete s.cell; delete s.areaName; delete s.areaKey;   // 출장 ZIP 존에선 홈 셀 매칭이 새면 안 된다
   s.published = 0; put(s);   // 재시도 기계 재장전
   const ok = await window.fitkinPublish();
   if (ok) {
@@ -1006,7 +1059,7 @@ window.fitkinAreaHome = async function () {
   const s = st();
   if (s.homeZip === undefined || (s.homeZip === (s.zip || "") && (s.homeCell || "") === (s.cell || ""))) { toast("you're already home 🏠"); return; }
   s.zip = s.homeZip; if (s.homeCell) s.cell = s.homeCell; else delete s.cell;
-  delete s.homeZip; delete s.homeCell;
+  delete s.homeZip; delete s.homeCell; delete s.areaName; delete s.areaKey;
   s.published = 0; put(s);
   const ok = await window.fitkinPublish();
   if (ok) { toast("back home 🏠"); paintDiscover(); }

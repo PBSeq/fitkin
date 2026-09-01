@@ -133,6 +133,27 @@
   .count p{color:var(--dim);font-size:15px}
 
   .qr{display:flex;gap:16px;align-items:center}
+  .qrail{display:flex;gap:12px;overflow-x:auto;padding:12px 2px;scroll-snap-type:x mandatory;
+         -webkit-overflow-scrolling:touch;scrollbar-width:none}
+  .qrail::-webkit-scrollbar{display:none}
+  .qslide{flex:none;scroll-snap-align:start;text-align:center;cursor:pointer;
+          transition:transform .2s var(--spring)}
+  .qslide:active{transform:scale(.96)}
+  .qslide .qbox{width:clamp(118px,36vw,150px);aspect-ratio:1;height:auto;border-radius:20px;background:#fff;padding:8px;
+        border:2px solid transparent;
+        background:linear-gradient(#fff,#fff) padding-box,
+                   conic-gradient(from 140deg,var(--volt),var(--mint),var(--volt)) border-box;
+        box-shadow:0 8px 22px rgba(0,0,0,.35)}
+  .qslide .qbox svg{width:100%;height:100%;border-radius:12px}
+  .qslide .qlabel{margin-top:8px;font-size:13.5px;font-weight:700;color:var(--mint)}
+  #qrZoom{position:fixed;inset:0;background:rgba(8,12,9,.94);backdrop-filter:blur(8px);z-index:70;
+          display:none;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:24px}
+  #qrZoom.on{display:flex;animation:up .3s var(--spring)}
+  #qrZoom .zbox{width:min(82vw,360px);aspect-ratio:1;background:#fff;border-radius:28px;padding:16px;
+          box-shadow:0 0 60px rgba(204,242,78,.25)}
+  #qrZoom .zbox svg{width:100%;height:100%}
+  #qrZoom .zlabel{font-size:20px;font-weight:700;color:var(--volt)}
+  #qrZoom p{color:var(--dim);font-size:14px}
   .qrbox{width:96px;height:96px;border-radius:18px;background:#fff;padding:6px;
          border:2px solid transparent;
          background:linear-gradient(#fff,#fff) padding-box,
@@ -285,7 +306,7 @@
     <span class="step-tag">2/3 · your vibe</span>
     <h1>how do you move?</h1>
     <div class="opt-group"><div class="opt-label">when</div>
-      <div class="seg" data-k="time"><button>🌅 mornings</button><button>☀️ daytime</button><button>🌙 nights</button></div></div>
+      <div class="seg" data-k="time" title="pick all that apply"><button>🌅 mornings</button><button>☀️ daytime</button><button>🌙 nights</button></div></div>
     <div class="opt-group"><div class="opt-label">energy</div>
       <div class="seg" data-k="mode"><button>😌 for the joy</button><button>🔥 competitive</button></div></div>
     <div class="opt-group"><div class="opt-label">level</div>
@@ -328,13 +349,16 @@
       <div><h3>your kin card</h3><p id="hLine"></p></div>
     </div><div class="tags" id="hTags"></div></div>
 
-    <div class="card"><div class="qr">
-      <div class="qrbox" id="qrCanvas"><span class="dimtext" style="font-size:11px;text-align:center">making<br>your code…</span></div>
-      <div><h3>your kin code</h3>
-        <p>met someone at the gym? show this — scan or share the link, you're kin. no numbers needed.</p>
-        <button class="scanbtn" onclick="fitkinScan()">📷 scan a code</button>
-        <button class="scanbtn" onclick="fitkinShare()">↗ share my link</button></div>
-    </div></div>
+    <div class="card">
+      <h3 style="font-size:17px;margin-bottom:2px">your kin codes</h3>
+      <p style="font-size:13.5px;color:var(--dim)">met someone at the gym? show the right sport — tap a code to go big for easy scanning. no numbers needed.</p>
+      <div style="display:flex;gap:14px;align-items:center">
+        <div class="qrail" id="qrCanvas" style="flex:1;min-width:0"><span class="dimtext" style="font-size:11px">making your codes…</span></div>
+        <div style="display:flex;flex-direction:column;gap:9px;flex:none">
+          <button class="scanbtn" style="margin-top:0" onclick="fitkinScan()">📷 scan a code</button>
+          <button class="scanbtn" style="margin-top:0" onclick="fitkinShare()">↗ share my link</button></div>
+      </div>
+    </div>
 
     <div class="card">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
@@ -343,6 +367,7 @@
         <button class="chat-act" onclick="fitkinAreaHome()">🏠</button></span>
       </div>
       <p class="dimtext" style="font-size:12.5px;margin-bottom:8px">your kin card (name · sports · area) is visible to other fitkin users — that's how kin find each other.</p>
+      <p id="areaRow" style="font-size:13.5px;font-weight:700;color:var(--volt);margin:2px 0 4px"></p>
       <p class="dimtext" id="seekRow" style="font-size:12.5px;margin-top:6px"></p>
       <div id="nearList"><p class="dimtext">finding people in your zip…</p></div>
       <button class="scanbtn" onclick="fitkinFeed()" style="width:100%">👀 open kin feed — browse everyone</button></div>
@@ -376,7 +401,7 @@ function go(n){document.querySelectorAll(".screen").forEach(s=>s.classList.remov
   $("#s"+n).classList.add("on");window.scrollTo(0,0);save()}
 function save(){const f=JSON.parse(localStorage.getItem("fitkin")||"{}");
   if(f.photoData&&!st.photoData)st.photoData=f.photoData;   // 번들이 저장한 프로필 사진 보존
-  ["cell","id","published","homeZip","homeCell"].forEach(k=>{if(k in f)st[k]=f[k]});  // 번들 소유 필드 승계
+  ["cell","id","published","homeZip","homeCell","areaName","areaKey","hidden","loginName"].forEach(k=>{if(k in f)st[k]=f[k]});  // 번들 소유 필드 승계
   localStorage.setItem("fitkin",JSON.stringify(st))}
 
 SPORTS.forEach(([e,n])=>{const c=document.createElement("div");c.className="chip";
@@ -388,9 +413,18 @@ SPORTS.forEach(([e,n])=>{const c=document.createElement("div");c.className="chip
 $("#b1").disabled=!st.sports.length;
 
 document.querySelectorAll(".seg").forEach(seg=>{const k=seg.dataset.k;
-  [...seg.children].forEach(b=>{ if(st.vibe[k]===b.textContent)b.classList.add("sel");
-    b.onclick=()=>{[...seg.children].forEach(x=>x.classList.remove("sel"));
-      b.classList.add("sel");st.vibe[k]=b.textContent;
+  const multi=k==="time";   // when 은 다중선택 (엔지니어 피드백 #1)
+  [...seg.children].forEach(b=>{
+    const sel=multi?(st.vibe[k]||"").split(" + ").includes(b.textContent):st.vibe[k]===b.textContent;
+    if(sel)b.classList.add("sel");
+    b.onclick=()=>{
+      if(multi){
+        b.classList.toggle("sel");
+        st.vibe[k]=[...seg.children].filter(x=>x.classList.contains("sel")).map(x=>x.textContent).join(" + ");
+      }else{
+        [...seg.children].forEach(x=>x.classList.remove("sel"));
+        b.classList.add("sel");st.vibe[k]=b.textContent;
+      }
       $("#b2").disabled=!(st.vibe.time&&st.vibe.mode&&st.vibe.level);save()}})});
 $("#b2").disabled=!(st.vibe.time&&st.vibe.mode&&st.vibe.level);
 
@@ -435,6 +469,11 @@ if(st.done)renderCard();
 window.renderCard=renderCard;   // 번들이 프로필 사진 갱신 후 재도색할 수 있게
 function reset(){localStorage.removeItem("fitkin");location.reload()}
 </script>
+<div id="qrZoom" onclick="this.classList.remove('on')">
+  <div class="zlabel" id="qzLabel"></div>
+  <div class="zbox" id="qzBox"></div>
+  <p>have them scan this — tap anywhere to close</p>
+</div>
 <div id="scanner"><p>point at a kin code</p><video id="scanVid" playsinline></video>
   <button class="btn ghost" onclick="fitkinScanStop()">cancel</button></div>
 <div id="review">

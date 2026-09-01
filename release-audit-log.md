@@ -426,3 +426,30 @@ VERDICT: FIX
 - 1차 판정 FIX: 신규분 결함 7건 (hidden 복원 누락 / 스태거 off-by-one / moments 탭 칩 잔존 / reduced-motion shine 잔상 / hidden 카피 과대주장 / 터치 타깃 35px / 폰트 웨이트 650 미로드)
 - 7건 전건 수리 + 브라우저 실측 → 재감사 전건 VERIFIED, 신규 결함 0 → PASS
 - 교훈(셀프이볼빙): 게이트 감사관은 완료가 보장되는 경로여야 한다. release-gate.sh를 Claude 에이전트 기반으로 교체 검토
+
+## 2026-08-30 nearby 반경 확장 (박사님 지시: "10마일 정도, 더 넓게 가도 됨")
+- cellNeighborhood 3x3 → 5x5 (반경 ~19km → ~40km ≈ 25mi). 쿼리 여전히 1회('in' 25셀 ≤ 30 한도)
+- 검증: 이웃 수 25, 대칭 불변식 30좌표 전건 통과, 날짜변경선 랩 유지, 브라우저 추천 리스트 정상·콘솔 에러 0
+- 상수 변경 + 기계 검증으로 갈음, 다음 게이트 라운드에 동승
+
+
+
+## 2026-08-31 20:26 release-gate
+## 2026-08-31 20:26 release-gate
+```
+Reading additional input from stdin...
+```
+```
+## 2026-08-31 20:26 release-gate
+Reading additional input from stdin...
+```
+```
+Reading additional input from stdin...
+```
+
+## 2026-08-31 게이트 행 원인 규명·수리
+- codex exec가 stdin 열림 상태에서 "Reading additional input from stdin..."으로 무한 대기 → 최대 23h 좀비 3건의 원인
+- release-gate.sh에 </dev/null 봉인. 낡은 codex FIX 출력 3건은 구코드 기준이라 무효 (Claude 감사관 PASS·발행 완료가 정본)
+
+## 2026-09-01 QR 카드 레이아웃 (박사님 피드백: 오른쪽 공간 비었음)
+- 스캔·공유 버튼을 QR 오른쪽 세로 스택으로, qbox 반응형 폭(clamp 118~150px)·snap start — 375px 스크린샷 검증 완료 (레이아웃 1건, 시각 검증으로 갈음)
