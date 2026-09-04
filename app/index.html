@@ -401,7 +401,7 @@ function go(n){document.querySelectorAll(".screen").forEach(s=>s.classList.remov
   $("#s"+n).classList.add("on");window.scrollTo(0,0);save()}
 function save(){const f=JSON.parse(localStorage.getItem("fitkin")||"{}");
   if(f.photoData&&!st.photoData)st.photoData=f.photoData;   // 번들이 저장한 프로필 사진 보존
-  ["cell","id","published","homeZip","homeCell","areaName","areaKey","hidden","loginName"].forEach(k=>{if(k in f)st[k]=f[k]});  // 번들 소유 필드 승계
+  ["cell","derivedCell","id","published","homeZip","homeCell","areaName","areaKey","hidden","loginName"].forEach(k=>{if(k in f)st[k]=f[k]});  // 번들 소유 필드 승계
   localStorage.setItem("fitkin",JSON.stringify(st))}
 
 SPORTS.forEach(([e,n])=>{const c=document.createElement("div");c.className="chip";

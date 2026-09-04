@@ -1035,9 +1035,31 @@ async function paintHome() {
   window.fitkinDrawQR();
   paintSeek();
   resolveAreaName();
+  ensureDerivedCell().then(ok => { if (ok) { window.fitkinPublish(); paintDiscover(); } });
   paintKin();
   paintDiscover();
   if (s.pendingKin) { const p = s.pendingKin; delete s.pendingKin; put(s); location.hash = "#kin=" + p; handleKinLink(); }
+}
+
+// ZIP → 유도 셀: ZIP 중심 좌표를 셀로 변환해 병기 — ZIP 유저와 위치(셀) 유저가
+// 서로를 발견하게 하는 다리. 실패해도 조용히(zip 매칭은 그대로 동작).
+async function deriveCellFromZip(zip) {
+  try {
+    const r = await fetch("https://api.zippopotam.us/us/" + zip);
+    if (!r.ok) return null;
+    const p = ((await r.json()).places || [])[0];
+    if (!p) return null;
+    return geohash5(parseFloat(p.latitude), parseFloat(p.longitude));
+  } catch (e) { return null; }
+}
+async function ensureDerivedCell() {
+  const s = st();
+  if (!/^[0-9]{5}$/.test(s.zip || "") || validCell(s.cell)) return false;
+  const cell = await deriveCellFromZip(s.zip);
+  const s2 = st();
+  if (!cell || s2.zip !== s.zip || validCell(s2.cell)) return false;   // 경합 폐기
+  s2.cell = cell; s2.derivedCell = 1; s2.published = 0; put(s2);
+  return true;
 }
 
 // ── 현재 지역 이름: ZIP→도시(zippopotam), 셀→도시(성긴 셀 중심만 질의 — 정밀 좌표 비전송) ──
@@ -1108,7 +1130,7 @@ window.fitkinArea = async function () {
   if (!/^[0-9]{5}$/.test(z.trim())) { toast("that's not a 5-digit zip"); return; }
   if (s.homeZip === undefined) s.homeZip = s.zip || "";
   if (s.homeCell === undefined) s.homeCell = s.cell || "";
-  s.zip = z.trim(); delete s.cell; delete s.areaName; delete s.areaKey;   // 출장 ZIP 존에선 홈 셀 매칭이 새면 안 된다
+  s.zip = z.trim(); delete s.cell; delete s.derivedCell; delete s.areaName; delete s.areaKey;   // 출장 ZIP 존에선 홈 셀 매칭이 새면 안 된다 (유도 셀은 새 zip 에서 재유도)
   s.published = 0; put(s);   // 재시도 기계 재장전
   const ok = await window.fitkinPublish();
   if (ok) {
