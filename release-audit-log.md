@@ -459,3 +459,9 @@ Reading additional input from stdin...
 - 수리: credLogin 폴백(email-already→signIn, 토큰 1회용 refresh 1회 재시도, 재귀 불가 구조) + 웹 경로 동일 + 게스트 안내 문구
 - test-engineer 판정 FIX(6.5/10) → P1(폴백 종착점) Auth Emulator 실측: link 재현 → 폴백 signIn 성공·기존 계정 자동 병합(providers 2종) → 요구 충족
 - 실측 스크립트 보존: tools/auth-emu-test.mjs
+
+## 2026-09-04 저녁 — "Apple 두 번 눌러야 로그인" 실기 결함 수리 (빌드11)
+- 실기 실측(박사님 폰): 구글 1탭 성공, Apple 2탭 필요 → 원인: 1회용 Apple 토큰이 link 시도에서 소비, 소비 토큰 재사용 폴백 실패
+- 서버 실증: 병합 자체는 성공(HmHe 계정 providers=google+apple) — 남은 결함은 UX(2탭)뿐
+- 수리: 폴백은 Apple만 fresh 자격증명 직행(구글은 재사용), 안전망 1회(재귀 불가) + 충돌 시 반대 provider 자동 브리지
+- 에뮬 회귀 3/3: 신규 link UID보존·기가입 폴백 1회 완결·구글 재사용 (tools/credlogin-regression.mjs 자산화)

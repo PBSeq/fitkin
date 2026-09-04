@@ -126,13 +126,15 @@ async function credLogin(c, refresh) {
         !String(e.code).includes("email-already-in-use") &&
         !String(e.code).includes("provider-already-linked")) throw e;
   }
+  // Apple id_token 은 1회용 — link 시도에서 이미 소비됐으므로 폴백은 처음부터
+  // fresh 자격증명으로 간다 (실기기 실측 09-04: 소비 토큰 재사용이 "두 번 눌러야
+  // 로그인"의 원인). refresh 가 없으면(웹/구글) 기존 자격증명 재사용.
+  const cred2 = (refresh && c.providerId === "apple.com") ? await refresh() : c;
   try {
-    return await signInWithCredential(auth, c);
+    return await signInWithCredential(auth, cred2);
   } catch (e) {
-    // 링크 시도에서 토큰이 소비됐으면 (invalid-credential 류) 새 토큰으로 1회 재시도
-    if (refresh && (String(e.code).includes("invalid-credential") ||
-                    String(e.code).includes("invalid-idp-response") ||
-                    String(e.code).includes("missing-or-invalid-nonce")))
+    // 남은 실패도 사용자 취소가 아니면 fresh 로 마지막 1회 (안전망, 재귀 없음)
+    if (refresh && !String(e.code).includes("canceled") && !String(e.code).includes("popup-closed"))
       return await signInWithCredential(auth, await refresh());
     throw e;
   }
@@ -164,7 +166,7 @@ async function nativeCred(kind) {
         rawNonce ? { idToken, rawNonce } : { idToken })
     : GoogleAuthProvider.credential(idToken);
 }
-window.fitkinLogin = async function (kind) {
+window.fitkinLogin = async function (kind, _retried) {
   try {
     let cred;
     if (nativeSL()) {
@@ -223,8 +225,15 @@ window.fitkinLogin = async function (kind) {
     paintAcct();
   } catch (e) {
     if (String(e.code).includes("account-exists-with-different-credential") ||
-        String(e.code).includes("email-already-in-use"))
-      toast("that email already has a fitkin sign-in — try the other button (or just tap let's go)");
+        String(e.code).includes("email-already-in-use")) {
+      // 이 이메일의 기존 계정은 다른 provider — 자동으로 그쪽 로그인으로 이어서 끝낸다.
+      const other = kind === "apple" ? "google" : "apple";
+      if (!_retried) {
+        toast("this email signed up with " + other + " — finishing with " + other + "…");
+        return window.fitkinLogin(other, true);
+      }
+      toast("that email already has a fitkin sign-in — try the " + other + " button (or just tap let's go)");
+    }
     else if (String(e.code).includes("operation-not-allowed"))
       toast("sign-in isn't available right now — tap let's go to continue as guest");
     else if (!String(e.code).includes("popup-closed") && !String(e.code).includes("canceled"))
