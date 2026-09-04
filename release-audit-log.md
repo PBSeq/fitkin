@@ -453,3 +453,9 @@ Reading additional input from stdin...
 
 ## 2026-09-01 QR 카드 레이아웃 (박사님 피드백: 오른쪽 공간 비었음)
 - 스캔·공유 버튼을 QR 오른쪽 세로 스택으로, qbox 반응형 폭(clamp 118~150px)·snap start — 375px 스크린샷 검증 완료 (레이아웃 1건, 시각 검증으로 갈음)
+
+## 2026-09-04 iOS 2.1a 거절 수리 — 로그인 폴백 사슬
+- 원인 실증: auth/email-already-in-use (iPad 시뮬 + 실계정 DIAG 캡처) — link 폴백 목록에 없어 로그인 사망
+- 수리: credLogin 폴백(email-already→signIn, 토큰 1회용 refresh 1회 재시도, 재귀 불가 구조) + 웹 경로 동일 + 게스트 안내 문구
+- test-engineer 판정 FIX(6.5/10) → P1(폴백 종착점) Auth Emulator 실측: link 재현 → 폴백 signIn 성공·기존 계정 자동 병합(providers 2종) → 요구 충족
+- 실측 스크립트 보존: tools/auth-emu-test.mjs

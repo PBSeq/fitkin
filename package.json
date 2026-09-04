@@ -1,0 +1,12 @@
+{
+  "name": "fitkin-site",
+  "version": "1.2.0",
+  "private": true,
+  "description": "fitkin web app — bundle pipeline (make_entry.py -> esbuild)",
+  "dependencies": {
+    "@tensorflow/tfjs": "^4.22.0",
+    "esbuild": "^0.28.2",
+    "firebase": "^12.18.0",
+    "nsfwjs": "^4.3.0"
+  }
+}

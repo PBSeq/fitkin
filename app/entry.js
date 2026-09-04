@@ -111,8 +111,11 @@ window.fitkinUseLocation = function (travel) {
 const GOOGLE_IOS_CLIENT_ID =
   "125721622489-cvj308ao2l8v2dhopj2rjh1g38crft1f.apps.googleusercontent.com";
 // 익명 세션에 자격증명을 "링크"해 UID 를 보존한다 — 이미 발행한 카드·킨·채팅이
-// 로그인 후에도 그대로 남는다. 그 자격증명이 딴 계정에 묶여 있을 때만 signIn 폴백.
-async function credLogin(c) {
+// 로그인 후에도 그대로 남는다. 링크가 거부되면(딴 계정에 묶임 / 같은 이메일이 이미
+// 다른 계정에 있음 — v1.2 심사 거절의 실원인 auth/email-already-in-use) signIn 폴백.
+// Apple id_token 은 1회용이라 링크 시도에서 소비될 수 있다 — refresh 로 새 자격증명을
+// 받아 폴백한다 (실기기에선 Face ID 한 번이 추가될 뿐).
+async function credLogin(c, refresh) {
   await ready;
   try {
     if (auth.currentUser && auth.currentUser.isAnonymous) {
@@ -120,9 +123,19 @@ async function credLogin(c) {
     }
   } catch (e) {
     if (!String(e.code).includes("credential-already-in-use") &&
+        !String(e.code).includes("email-already-in-use") &&
         !String(e.code).includes("provider-already-linked")) throw e;
   }
-  return signInWithCredential(auth, c);
+  try {
+    return await signInWithCredential(auth, c);
+  } catch (e) {
+    // 링크 시도에서 토큰이 소비됐으면 (invalid-credential 류) 새 토큰으로 1회 재시도
+    if (refresh && (String(e.code).includes("invalid-credential") ||
+                    String(e.code).includes("invalid-idp-response") ||
+                    String(e.code).includes("missing-or-invalid-nonce")))
+      return await signInWithCredential(auth, await refresh());
+    throw e;
+  }
 }
 function nativeSL() {
   return window.Capacitor && window.Capacitor.isNativePlatform &&
@@ -155,7 +168,7 @@ window.fitkinLogin = async function (kind) {
   try {
     let cred;
     if (nativeSL()) {
-      cred = await credLogin(await nativeCred(kind));
+      cred = await credLogin(await nativeCred(kind), () => nativeCred(kind));
     } else {
       const provider = kind === "apple" ? new OAuthProvider("apple.com") : new GoogleAuthProvider();
       // 웹도 네이티브와 동일하게: 익명 세션에 링크(UID 보존), 기존 계정이면 signIn 폴백
@@ -165,6 +178,7 @@ window.fitkinLogin = async function (kind) {
           cred = await linkWithPopup(auth.currentUser, provider, browserPopupRedirectResolver);
       } catch (e) {
         if (!String(e.code).includes("credential-already-in-use") &&
+            !String(e.code).includes("email-already-in-use") &&
             !String(e.code).includes("provider-already-linked")) throw e;
       }
       if (!cred) cred = await signInWithPopup(auth, provider, browserPopupRedirectResolver);
@@ -208,12 +222,13 @@ window.fitkinLogin = async function (kind) {
     if (nameEl && !nameEl.value && s.loginName) { nameEl.value = s.loginName.split(" ")[0]; nameEl.dispatchEvent(new Event("input")); }
     paintAcct();
   } catch (e) {
-    if (String(e.code).includes("account-exists-with-different-credential"))
-      toast("that email is already tied to your other sign-in — try the other button");
+    if (String(e.code).includes("account-exists-with-different-credential") ||
+        String(e.code).includes("email-already-in-use"))
+      toast("that email already has a fitkin sign-in — try the other button (or just tap let's go)");
     else if (String(e.code).includes("operation-not-allowed"))
-      toast("sign-in isn't available right now — guest mode works fine");
+      toast("sign-in isn't available right now — tap let's go to continue as guest");
     else if (!String(e.code).includes("popup-closed") && !String(e.code).includes("canceled"))
-      toast("login hiccup — guest mode works fine");
+      toast("sign-in didn't work — no worries, tap let's go to continue as guest");
   }
 };
 // 로그아웃: 카드·킨은 서버에 남는다. 재로그인하면 그대로 복원.
