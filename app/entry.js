@@ -115,13 +115,21 @@ const GOOGLE_IOS_CLIENT_ID =
 // 다른 계정에 있음 — v1.2 심사 거절의 실원인 auth/email-already-in-use) signIn 폴백.
 // Apple id_token 은 1회용이라 링크 시도에서 소비될 수 있다 — refresh 로 새 자격증명을
 // 받아 폴백한다 (실기기에선 Face ID 한 번이 추가될 뿐).
+function atrace(step) {
+  try { const s = st(); s.authTrace = [...(s.authTrace || []).slice(-19),
+    Date.now() % 100000 + ":" + step]; put(s); } catch (e) {}
+}
 async function credLogin(c, refresh) {
   await ready;
   try {
     if (auth.currentUser && auth.currentUser.isAnonymous) {
-      return await linkWithCredential(auth.currentUser, c);
+      atrace("link-try");
+      const r = await linkWithCredential(auth.currentUser, c);
+      atrace("link-ok"); return r;
     }
+    atrace("no-anon:" + (auth.currentUser ? "user" : "null"));
   } catch (e) {
+    atrace("link-fail:" + e.code);
     if (!String(e.code).includes("credential-already-in-use") &&
         !String(e.code).includes("email-already-in-use") &&
         !String(e.code).includes("provider-already-linked")) throw e;
@@ -129,13 +137,24 @@ async function credLogin(c, refresh) {
   // Apple id_token 은 1회용 — link 시도에서 이미 소비됐으므로 폴백은 처음부터
   // fresh 자격증명으로 간다 (실기기 실측 09-04: 소비 토큰 재사용이 "두 번 눌러야
   // 로그인"의 원인). refresh 가 없으면(웹/구글) 기존 자격증명 재사용.
-  const cred2 = (refresh && c.providerId === "apple.com") ? await refresh() : c;
+  let cred2 = c;
+  if (refresh && c.providerId === "apple.com") {
+    atrace("refresh-try");
+    try { cred2 = await refresh(); atrace("refresh-ok"); }
+    catch (e) { atrace("refresh-fail:" + (e.code || String(e).slice(0, 40))); throw e; }
+  }
   try {
-    return await signInWithCredential(auth, cred2);
+    const r = await signInWithCredential(auth, cred2);
+    atrace("signin-ok"); return r;
   } catch (e) {
+    atrace("signin-fail:" + e.code);
     // 남은 실패도 사용자 취소가 아니면 fresh 로 마지막 1회 (안전망, 재귀 없음)
-    if (refresh && !String(e.code).includes("canceled") && !String(e.code).includes("popup-closed"))
-      return await signInWithCredential(auth, await refresh());
+    if (refresh && !String(e.code).includes("canceled") && !String(e.code).includes("popup-closed")) {
+      atrace("retry-try");
+      try { const r2 = await signInWithCredential(auth, await refresh());
+        atrace("retry-ok"); return r2; }
+      catch (e2) { atrace("retry-fail:" + (e2.code || String(e2).slice(0, 40))); throw e2; }
+    }
     throw e;
   }
 }
@@ -158,8 +177,10 @@ async function nativeCred(kind) {
     opts.nonce = Array.from(new Uint8Array(d),
       b => b.toString(16).padStart(2, "0")).join("");
   }
+  atrace("sheet-open:" + kind);
   const r = await SL.login({ provider: kind, options: opts });
   const idToken = r && r.result && r.result.idToken;
+  atrace(idToken ? "sheet-token" : "sheet-notoken");
   if (!idToken) throw Object.assign(new Error("no idToken"), { code: "popup-closed" });
   return kind === "apple"
     ? new OAuthProvider("apple.com").credential(
@@ -237,7 +258,7 @@ window.fitkinLogin = async function (kind, _retried) {
     else if (String(e.code).includes("operation-not-allowed"))
       toast("sign-in isn't available right now — tap let's go to continue as guest");
     else if (!String(e.code).includes("popup-closed") && !String(e.code).includes("canceled"))
-      toast("sign-in didn't work — no worries, tap let's go to continue as guest");
+      toast("sign-in didn't work (" + (e.code || "unknown") + ") \u2014 tap let's go to continue as guest");
   }
 };
 // 로그아웃: 카드·킨은 서버에 남는다. 재로그인하면 그대로 복원.
