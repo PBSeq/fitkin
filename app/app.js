@@ -124,11 +124,15 @@ function atrace(step) {
 }
 async function credLogin(c, refresh) {
   await ready;
+  let linkTried = false;
   try {
-    if (auth.currentUser && auth.currentUser.isAnonymous) {
+    // 카드 없는 익명(웰컴 로그인)은 보존할 것이 없다 — link 생략하고 바로 signIn.
+    // 기가입 계정이면 시트 1번으로 즉시 성공(TRACE 실측: link 경유가 "시트 2번"의 원인).
+    // 카드를 발행한 익명만 link 로 UID(킨·채팅)를 보존한다.
+    if (auth.currentUser && auth.currentUser.isAnonymous && st().done) {
       const { linkWithCredential } =
         await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js");
-      atrace("link-try");
+      atrace("link-try"); linkTried = true;
       const r = await linkWithCredential(auth.currentUser, c);
       atrace("link-ok"); return r;
     }
@@ -143,7 +147,9 @@ async function credLogin(c, refresh) {
   // fresh 자격증명으로 간다 (실기기 실측 09-04: 소비 토큰 재사용이 "두 번 눌러야
   // 로그인"의 원인). refresh 가 없으면(웹/구글) 기존 자격증명 재사용.
   let cred2 = c;
-  if (refresh && c.providerId === "apple.com") {
+  // fresh 재발급은 "link 를 실제로 시도해 토큰이 소비된" 경우에만 — link 를 안 탔으면
+  // 원 토큰이 멀쩡하므로 그대로 signIn (과잉 refresh 가 "시트 2번"의 진범, TRACE 실측 09-04)
+  if (refresh && linkTried && c.providerId === "apple.com") {
     atrace("refresh-try");
     try { cred2 = await refresh(); atrace("refresh-ok"); }
     catch (e) { atrace("refresh-fail:" + (e.code || String(e).slice(0, 40))); throw e; }

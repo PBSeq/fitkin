@@ -465,3 +465,9 @@ Reading additional input from stdin...
 - 서버 실증: 병합 자체는 성공(HmHe 계정 providers=google+apple) — 남은 결함은 UX(2탭)뿐
 - 수리: 폴백은 Apple만 fresh 자격증명 직행(구글은 재사용), 안전망 1회(재귀 불가) + 충돌 시 반대 provider 자동 브리지
 - 에뮬 회귀 3/3: 신규 link UID보존·기가입 폴백 1회 완결·구글 재사용 (tools/credlogin-regression.mjs 자산화)
+
+## 2026-09-04 밤 — "Apple 시트 2번" 최종 수리 (빌드13) · 실기 GREEN
+- TRACE 실측(케이블·appDataContainer pull)으로 진범 확정: 빌드11의 "Apple 무조건 fresh"가 과잉 — link 미경유 경로에서도 시트를 재오픈
+- 수리: linkTried 플래그 — link로 토큰이 실제 소비된 경우에만 fresh 재발급. 웰컴(카드 없는 익명)은 link 생략 signIn-first
+- 검증: 박사님 실기 "한번에 됐어"(Face ID 1회) + 에뮬 회귀 3/3(신규 UID보존·기가입 병합 refresh=1·구글 재사용 refresh=0)
+- 진단 alert 제거, authTrace 계측·토스트 에러코드는 영구 유지. 로그북 E-002b 등재
