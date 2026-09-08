@@ -321,7 +321,7 @@
     <h1>when do you show up?</h1>
     <p class="sub">tap the days you can usually move.</p>
     <div class="grid7" id="days"></div>
-    <div class="opt-group" style="margin-top:22px"><div class="opt-label">first name</div>
+    <div class="opt-group" style="margin-top:22px"><div class="opt-label">display name</div>
       <input class="field" id="fName" maxlength="30" placeholder="what do we call you?"></div>
     <div class="opt-group"><div class="opt-label">where you work out</div>
       <input class="field" id="fZip" maxlength="5" inputmode="numeric" pattern="[0-9]*"
@@ -438,7 +438,7 @@ function hasArea(){if(/^[0-9]{5}$/.test($("#fZip").value.trim()))return true;
   const f=JSON.parse(localStorage.getItem("fitkin")||"{}");
   return typeof f.cell==="string"&&/^[0-9b-hjkmnp-z]{5}$/.test(f.cell)}
 function checkS3(){$("#b3").disabled=!(st.days.length&&$("#fName").value.trim()&&hasArea())}
-$("#fName").value=st.name||""; $("#fZip").value=st.zip||"";
+$("#fName").value=st.name||((st.loginName||"").split(" ")[0])||""; $("#fZip").value=st.zip||"";
 $("#fName").oninput=$("#fZip").oninput=checkS3;
 checkS3();
 

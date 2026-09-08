@@ -175,6 +175,8 @@ function nativeSL() {
          window.Capacitor.Plugins && window.Capacitor.Plugins.SocialLogin;
 }
 // 네이티브 로그인 시트를 띄워 Firebase 자격증명을 만든다 (로그인·재인증 공용)
+// Apple 은 최초 승인 1회만 이름을 준다 — 그 1회를 여기서 잡아 보존한다 (4.0 Design)
+let lastAuthProfile = null;
 async function nativeCred(kind) {
   const SL = nativeSL();
   await SL.initialize({ google: { iOSClientId: GOOGLE_IOS_CLIENT_ID }, apple: {} });
@@ -190,6 +192,10 @@ async function nativeCred(kind) {
   }
   atrace("sheet-open:" + kind);
   const r = await SL.login({ provider: kind, options: opts });
+  const pr = r && r.result && r.result.profile;
+  if (pr && (pr.givenName || pr.name || pr.email))
+    lastAuthProfile = { name: [pr.givenName, pr.familyName].filter(Boolean).join(" ") || pr.name || "",
+                        email: pr.email || "" };
   const idToken = r && r.result && r.result.idToken;
   atrace(idToken ? "sheet-token" : "sheet-notoken");
   if (!idToken) throw Object.assign(new Error("no idToken"), { code: "popup-closed" });
@@ -222,7 +228,8 @@ window.fitkinLogin = async function (kind, _retried) {
     const s = st();
     // 링크 로그인은 top-level displayName 이 비어 있다 — providerData 에서 폴백
     s.loginName = cred.user.displayName ||
-      (((cred.user.providerData || []).find(p => p && p.displayName) || {}).displayName) || "";
+      (((cred.user.providerData || []).find(p => p && p.displayName) || {}).displayName) ||
+      (lastAuthProfile && lastAuthProfile.name) || s.loginName || "";
     put(s);
     UID = cred.user.uid;
     // 이 계정으로 만든 카드가 서버에 있으면 그대로 복원 — 재설치·재로그인 관통.
@@ -254,8 +261,16 @@ window.fitkinLogin = async function (kind, _retried) {
     }
     toast("signed in" + (s.loginName ? " as " + s.loginName.split(" ")[0] : "") + " ✓");
     const row = $("#loginRow"); if (row) row.style.display = "none";
+    // 4.0 Design: Apple/Google 로그인 뒤엔 이름 입력을 요구하지 않는다 — 항상 미리 채운다.
     const nameEl = $("#fName");
-    if (nameEl && !nameEl.value && s.loginName) { nameEl.value = s.loginName.split(" ")[0]; nameEl.dispatchEvent(new Event("input")); }
+    if (nameEl && !nameEl.value) {
+      const given = (s.loginName || "").split(" ")[0];
+      const em = cred.user.email || (lastAuthProfile && lastAuthProfile.email) || "";
+      const local = em && !/privaterelay/.test(em)
+        ? em.split("@")[0].replace(/[^a-zA-Z0-9]/g, "").slice(0, 12) : "";
+      nameEl.value = given || local || ("kin" + Math.floor(10 + Math.random() * 90));
+      nameEl.dispatchEvent(new Event("input"));
+    }
     paintAcct();
   } catch (e) {
     if (String(e.code).includes("account-exists-with-different-credential") ||
