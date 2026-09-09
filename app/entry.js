@@ -1221,11 +1221,33 @@ window.fitkinDelete = async function () {
   } catch (e) { toast("couldn't reach the server — try again online"); }
 };
 
-// 컴플레인·피드백 창구 — 서버 접수함(feedback)으로 직행, 운영자(자비스)가 매일 검토.
+// 고객센터 — 인앱 시트: 제출 + 내 메시지·답글 열람 (박사님 지시 09-09, HANDeMANbid 이식).
+// 접수함(feedback)에 쓰고, 운영자(자비스)가 매일 검토·답글(reply) — 답글은 여기서 보인다.
 window.fitkinFeedback = async function () {
-  const text = (prompt("what's going on? bugs, complaints, ideas — we read every message.") || "").trim().slice(0, 1000);
-  if (!text) return;
-  const contact = (prompt("want a reply? leave an email (optional)") || "").trim().slice(0, 100);
+  let bg = document.getElementById("supportSheet");
+  if (bg) { bg.remove(); return; }
+  bg = document.createElement("div");
+  bg.id = "supportSheet";
+  bg.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:900;display:flex;align-items:flex-end;justify-content:center";
+  bg.onclick = e => { if (e.target === bg) bg.remove(); };
+  bg.innerHTML = `<div style="background:var(--card,#141c16);border:1px solid var(--line,#26332a);
+      border-radius:24px 24px 0 0;padding:20px 18px 28px;width:100%;max-width:520px;max-height:82vh;overflow-y:auto">
+    <h3 style="margin:0 0 4px">support 💬</h3>
+    <p class="dimtext" style="margin:0 0 10px">bugs, complaints, ideas — we read every message and reply here.</p>
+    <textarea id="supText" maxlength="1000" rows="3" class="field" style="width:100%;box-sizing:border-box"
+      placeholder="what's going on?"></textarea>
+    <input id="supContact" maxlength="100" class="field" style="width:100%;box-sizing:border-box;margin-top:8px"
+      placeholder="email for a reply (optional — replies also show up right here)">
+    <button class="btn" style="width:100%;margin-top:10px" onclick="fitkinSupportSend()">send</button>
+    <div id="supList" style="margin-top:16px"><p class="dimtext">loading your messages…</p></div>
+  </div>`;
+  document.body.appendChild(bg);
+  fitkinSupportList();
+};
+window.fitkinSupportSend = async function () {
+  const text = (document.getElementById("supText").value || "").trim().slice(0, 1000);
+  if (!text) { toast("write a message first"); return; }
+  const contact = (document.getElementById("supContact").value || "").trim().slice(0, 100);
   try {
     await ready;
     if (!UID) { toast("you're offline — try again when you're back"); return; }
@@ -1234,8 +1256,26 @@ window.fitkinFeedback = async function () {
       app: (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) ? "ios" : "web",
       ts: Date.now(),
     });
-    toast("got it — thank you 💚 we read every message");
+    document.getElementById("supText").value = "";
+    toast("got it — thank you 💚 we reply within a day");
+    fitkinSupportList();
   } catch (e) { toast("couldn't send — try again in a moment"); }
+};
+window.fitkinSupportList = async function () {
+  const el = document.getElementById("supList"); if (!el) return;
+  try {
+    await ready;
+    if (!UID) { el.innerHTML = ""; return; }
+    const q = query(collection(db, "feedback"), where("by", "==", UID));
+    const snap = await getDocs(q);
+    const rows = snap.docs.map(d => d.data()).sort((a, b) => b.ts - a.ts).slice(0, 20);
+    el.innerHTML = rows.length ? rows.map(r => `
+      <div style="border:1px solid var(--line,#26332a);border-radius:14px;padding:10px 12px;margin-bottom:8px">
+        <p style="margin:0;font-size:14px">${esc(r.text)}</p>
+        ${r.reply ? `<p style="margin:6px 0 0;font-size:13.5px;color:var(--mint,#bfe8cd)">↳ fitkin: ${esc(r.reply)}</p>`
+                  : `<p class="dimtext" style="margin:6px 0 0;font-size:12px">waiting for reply…</p>`}
+      </div>`).join("") : "";
+  } catch (e) { el.innerHTML = ""; }
 };
 window.fitkinHome = paintHome;
 // 인라인 renderCard 는 번들보다 먼저 실행돼 SVG 아바타를 모른다 — 로드 직후 한 번 재도색

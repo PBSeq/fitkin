@@ -162,7 +162,9 @@ service cloud.firestore {
                     && request.resource.data.app is string
                     && request.resource.data.app.size() <= 10
                     && request.resource.data.ts is number;
-      allow read, update, delete: if false;
+      // 본인 티켓만 읽기 허용 — 고객센터 답글(reply·replyTs·status, 관리 토큰이 기록)을 앱에서 보여준다
+      allow read: if request.auth != null && resource.data.by == request.auth.uid;
+      allow update, delete: if false;
     }
 
 
