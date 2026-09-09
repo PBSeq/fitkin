@@ -198,7 +198,7 @@ service cloud.firestore {
                     && request.resource.data.tags.hasOnly(['on-time','great-energy','matched-level','good-communicator','would-train-again','pushes-me','patient-teacher'])
                     && request.resource.data.comment is string
                     && request.resource.data.comment.size() <= 140
-                    && request.resource.data.levelCheck in ['','new-ish','steady','serious']
+                    && request.resource.data.levelCheck in ['','day one','new-ish','steady','serious','beast mode']
                     && request.resource.data.ts is number
                     && request.resource.data.visibleAfter is number
                     && request.resource.data.visibleAfter >= request.resource.data.ts
@@ -217,7 +217,7 @@ service cloud.firestore {
                     && request.resource.data.tags.size() <= 5
                     && request.resource.data.tags.hasOnly(['on-time','great-energy','matched-level','good-communicator','would-train-again','pushes-me','patient-teacher'])
                     && request.resource.data.comment.size() <= 140
-                    && request.resource.data.levelCheck in ['','new-ish','steady','serious']
+                    && request.resource.data.levelCheck in ['','day one','new-ish','steady','serious','beast mode']
                     && request.resource.data.visibleAfter >= resource.data.ts
                     && request.resource.data.visibleAfter <= resource.data.ts + 1209600000;
       // 작성자만 삭제. 수신 리뷰 청산은 관리자 경로(moderate.py cleanorphans) — 클라 권한 최소화

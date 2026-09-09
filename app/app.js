@@ -349,6 +349,8 @@ window.fitkinPublish = async function () {
   }
 };
 
+// 운동 레벨 5단계 (박사님 지시 09-09) — 기존 3값(new-ish·steady·serious)을 보존한 확장이라 마이그레이션 0
+const LEVELS = ["day one", "new-ish", "steady", "serious", "beast mode"];
 function overlap(mine, theirs) {
   return (mine || []).filter(x => (theirs || []).includes(x));
 }
@@ -380,14 +382,14 @@ async function discover() {
   const blocked = await myBlocks();
   const seen = new Set([UID, ...blocked]);
   // 매칭 랭킹: 종목(x2) + 요일 겹침 + 시간대·에너지 일치 + 레벨 근접 — 카피 그대로의 매칭
-  const LV = ["new-ish", "steady", "serious"];
+  const LV = LEVELS;   // 5단계 (레거시 3값은 부분집합이라 그대로 유효)
   const rank = p => {
     let sc = overlap(s.sports, p.sports).length * 2;
     sc += Math.min(2, (s.days || []).filter(d => (p.days || []).includes(d)).length * 0.4);
     const v = s.vibe || {}, w = p.vibe || {};
     if (v.time && w.time && v.time.split(" + ").some(t => w.time.split(" + ").includes(t))) sc += 1;
     if (v.mode && v.mode === w.mode) sc += 1;
-    if (v.level && w.level) sc += 1 - Math.min(1, Math.abs(LV.indexOf(v.level.trim()) - LV.indexOf(w.level.trim())) * 0.5);
+    if (v.level && w.level) sc += 1 - Math.min(1, Math.abs(LV.indexOf(v.level.trim()) - LV.indexOf(w.level.trim())) * 0.25);
     return -sc;
   };
   const safeRank = p => { try { return rank(p); } catch (e) { return 0; } };   // 조작 프로필 1건이 전체 추천을 죽이지 못하게
@@ -656,7 +658,7 @@ async function paintFeed() {
        `<button class="fchip${feedSport === sp ? " sel" : ""}" onclick="fitkinFeedFilter('${sp}')">${esc(sp)}</button>`)].join("");
   const chips2 = $("#feedChips2");
   if (chips2) chips2.innerHTML =
-    [...["new-ish", "steady", "serious"].map(lv =>
+    [...LEVELS.map(lv =>
        `<button class="fchip${feedLevel === lv ? " sel" : ""}" onclick="fitkinFeedLevel('${lv}')">${esc(lv)}</button>`),
      ...[["🌅 mornings", "🌅"], ["☀️ daytime", "☀️"], ["🌙 nights", "🌙"]].map(([t, ico]) =>
        `<button class="fchip${feedTime === t ? " sel" : ""}" onclick="fitkinFeedTime('${t}')">${ico} ${esc(t.split(" ")[1])}</button>`)].join("");
@@ -668,7 +670,11 @@ async function paintFeed() {
   try {
     const { hood, near } = await discover();
     const flt = k => (!feedSport || (k.sports || []).includes(feedSport))
-      && (!feedLevel || ((k.vibe || {}).level || "").trim() === feedLevel)
+      && (!feedLevel || (() => {
+           const a = LEVELS.indexOf(((k.vibe || {}).level || "").trim()), b = LEVELS.indexOf(feedLevel);
+           return (a >= 0 && b >= 0) ? Math.abs(a - b) <= 1
+                                     : ((k.vibe || {}).level || "").trim() === feedLevel;
+         })())
       && (!feedTime || ((k.vibe || {}).time || "").split(" + ").includes(feedTime));
     const h = hood.filter(flt), n = near.filter(flt);
     const rows = [
@@ -881,7 +887,7 @@ function paintReviewSheet() {
     `<button class="rvstar${n <= rvStars ? " sel" : ""}" onclick="fitkinRvStar(${n})">★</button>`).join("");
   $("#rvTags").innerHTML = REVIEW_TAGS.map(t =>
     `<button class="fchip${rvTags.includes(t) ? " sel" : ""}" onclick="fitkinRvTag('${t}')">${t.replace(/-/g, " ")}</button>`).join("");
-  $("#rvLevels").innerHTML = ["new-ish", "steady", "serious"].map(l =>
+  $("#rvLevels").innerHTML = LEVELS.map(l =>
     `<button class="fchip${rvLevel === l ? " sel" : ""}" onclick="fitkinRvLevel('${l}')">${l}</button>`).join("");
   $("#rvSubmit").disabled = !rvStars;
 }
