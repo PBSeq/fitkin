@@ -425,6 +425,99 @@ function personRow(k, mine) {
       : esc((k.sports || []).slice(0, 3).join(" · "))} · ${esc(area)}</p></div></div>`;
 }
 
+// ── 웨이브(킨 요청) — 발견 피드에서 연락 시작. 더블 옵트인: 서로 웨이브해야 채팅이 열린다.
+// 일방 DM 금지가 설계 원칙(스토킹·스팸 차단) — 박사님 지시 09-10.
+let myWavesOut = null;          // 내가 보낸 웨이브 대상 Set (캐시)
+async function wavesOut() {
+  if (myWavesOut) return myWavesOut;
+  myWavesOut = new Set();
+  try {
+    const qs = await getDocs(query(collection(db, "waves"), where("from", "==", UID), limit(100)));
+    qs.forEach(d => myWavesOut.add(d.data().to));
+  } catch (e) {}
+  return myWavesOut;
+}
+window.fitkinWave = async function (otherId, otherName) {
+  try {
+    await ready;
+    if (!UID) { toast("connect to the internet to wave"); return; }
+    if (!st().done) { toast("build your kin card first — then you can wave 👋"); return; }
+    // 상대가 이미 나에게 웨이브했으면 즉시 킨 성립 (수락 경로)
+    const inbound = await getDoc(doc(db, "waves", otherId + "_" + UID));
+    if (inbound.exists()) { await acceptWave(otherId, otherName); return; }
+    await setDoc(doc(db, "waves", UID + "_" + otherId), { from: UID, to: otherId, ts: Date.now() });
+    (await wavesOut()).add(otherId);
+    toast("waved at " + (otherName || "them") + " 👋 — you'll be kin when they wave back");
+    paintDiscover(); paintWaves();
+  } catch (e) { toast("couldn't wave — try again online"); }
+};
+// 웨이브 수락 = 링크 생성 + 양방향 웨이브 정리 → 기존 채팅이 그대로 열린다
+async function acceptWave(otherId, otherName) {
+  const linkId = [UID, otherId].sort().join("_");
+  await setDoc(doc(db, "links", linkId),
+    { a: UID < otherId ? UID : otherId, b: UID < otherId ? otherId : UID, ts: Date.now() });
+  for (const id of [otherId + "_" + UID, UID + "_" + otherId]) {
+    try { await deleteDoc(doc(db, "waves", id)); } catch (e) {}
+  }
+  myWavesOut = null;
+  toast("you're kin with " + (otherName || "them") + " 🎉 — say hi");
+  paintWaves(); paintKin(); paintDiscover();
+  setTimeout(() => openChat(otherId, otherName), 400);
+}
+window.fitkinWaveBack = acceptWave;
+window.fitkinWaveIgnore = async function (otherId) {
+  try { await deleteDoc(doc(db, "waves", otherId + "_" + UID)); } catch (e) {}
+  toast("ignored");
+  paintWaves();
+};
+// 받은 웨이브 섹션 — 홈 킨 목록 위에 그린다
+async function paintWaves() {
+  const wrap = $("#waveList"); if (!wrap) return;
+  try {
+    await ready;
+    if (!UID) { wrap.innerHTML = ""; return; }
+    const qs = await getDocs(query(collection(db, "waves"), where("to", "==", UID), limit(30)));
+    const rows = [];
+    for (const d of qs.docs) {
+      const from = d.data().from;
+      if (await isBlockedByMe(from)) continue;
+      const p = await getDoc(doc(db, "profiles", from));
+      if (!p.exists()) continue;
+      const k = { id: from, ...p.data() };
+      rows.push(personRow(k, st().sports) +
+        `<div style="text-align:right;margin:-6px 0 10px">
+           <button class="chat-act wave-back" data-kin="${esc(from)}" data-name="${esc(k.name)}">👋 wave back</button>
+           <button class="chat-act wave-ignore" data-kin="${esc(from)}">ignore</button></div>`);
+    }
+    wrap.innerHTML = rows.length
+      ? `<h3 style="margin:0 0 8px">👋 waved at you</h3>` + rows.join("") +
+        `<p class="dimtext">wave back and you're kin — then you can message.</p>`
+      : "";
+    wrap.querySelectorAll(".wave-back").forEach(b =>
+      b.onclick = e => { e.stopPropagation(); fitkinWaveBack(b.dataset.kin, b.dataset.name); });
+    wrap.querySelectorAll(".wave-ignore").forEach(b =>
+      b.onclick = e => { e.stopPropagation(); fitkinWaveIgnore(b.dataset.kin); });
+  } catch (e) { wrap.innerHTML = ""; }
+}
+// 발견·피드 행에 👋 버튼 주입 (이미 킨이거나 이미 웨이브한 상대는 제외)
+async function decorateWaveButtons(container) {
+  if (!container || !UID || !st().done) return;
+  const sent = await wavesOut();
+  const kinIds = new Set((await myKin()).map(k => k.id));
+  for (const r of [...container.querySelectorAll(".kinrow[data-kin]")]) {
+    const id = r.dataset.kin;
+    if (kinIds.has(id) || r.nextElementSibling?.querySelector?.(".wave-btn")) continue;
+    const bar = document.createElement("div");
+    bar.style.cssText = "text-align:right;margin:-6px 0 8px";
+    bar.innerHTML = sent.has(id)
+      ? `<span class="dimtext" style="font-size:12px">👋 waved — waiting for them</span>`
+      : `<button class="chat-act wave-btn" data-kin="${esc(id)}" data-name="${esc(r.dataset.name)}">👋 wave</button>`;
+    r.after(bar);
+    const b = bar.querySelector(".wave-btn");
+    if (b) b.onclick = e => { e.stopPropagation(); fitkinWave(b.dataset.kin, b.dataset.name); };
+  }
+}
+
 async function paintDiscover() {
   const wrap = $("#nearList"); if (!wrap) return;
   try {
@@ -438,7 +531,7 @@ async function paintDiscover() {
     wrap.innerHTML = rows.length
       ? rows.join("") + `<p class="dimtext" style="margin-top:10px">see someone at the gym? scan their kin code to connect.</p>`
       : `<p class="dimtext">no one around here yet — you're first. share fitkin with your crew.</p>`;
-    decorateRows(wrap);
+    decorateRows(wrap); decorateWaveButtons(wrap);
   } catch (e) { wrap.innerHTML = `<p class="dimtext">couldn't load nearby kin — check connection.</p>`; }
 }
 
@@ -678,7 +771,7 @@ async function paintFeed() {
       : `<p class="dimtext">${feedSport
           ? `no ${esc(feedSport)} kin around here yet — clear the filter or share fitkin with your crew.`
           : `no one around here yet — you're first. share fitkin with your crew.`}</p>`;
-    if (rows.length) decorateRows(wrap);
+    if (rows.length) { decorateRows(wrap); decorateWaveButtons(wrap); }
   } catch (e) { wrap.innerHTML = `<p class="dimtext">couldn't load the feed — check connection.</p>`; }
 }
 
@@ -809,6 +902,7 @@ async function decorateRows(container) {
   }
 }
 async function paintKin() {
+  paintWaves();
   const wrap = $("#kinList"); if (!wrap) return;
   const s = st();
   let kin = await myKin();
