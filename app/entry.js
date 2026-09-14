@@ -263,6 +263,8 @@ window.fitkinLogin = async function (kind, _retried) {
         ? em.split("@")[0].replace(/[^a-zA-Z0-9]/g, "").slice(0, 12) : "";
       nameEl.value = given || local || ("kin" + Math.floor(10 + Math.random() * 90));
       nameEl.dispatchEvent(new Event("input"));
+      // 프리필 영속화: 온보딩 도중 앱이 죽어도 재진입 시 이름 요구가 되살아나지 않게 (test-engineer P2)
+      if (!s.loginName) { s.loginName = nameEl.value; put(s); }
     }
     paintAcct();
   } catch (e) {
