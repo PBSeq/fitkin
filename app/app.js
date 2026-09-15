@@ -353,6 +353,9 @@ window.fitkinPublish = async function () {
 
 // 운동 레벨 5단계 (박사님 지시 09-09) — 기존 3값(new-ish·steady·serious)을 보존한 확장이라 마이그레이션 0
 const LEVELS = ["day one", "new-ish", "steady", "serious", "beast mode"];
+// 나이대·성별 (박사님 지시 09-14) — 카드에 표시 + 피드 필터. 둘 다 온보딩에서 선택 사항.
+const AGES = ["18–24", "25–34", "35–44", "45–54", "55+"];
+const GENDERS = ["woman", "man", "non-binary"];   // "rather not say"는 필터 대상 아님
 function overlap(mine, theirs) {
   return (mine || []).filter(x => (theirs || []).includes(x));
 }
@@ -432,7 +435,9 @@ function personRow(k, mine) {
     <span class="kava">${av}</span>
     <div style="flex:1"><b>${esc(k.name)}</b><p>${shared.length
       ? `<span class="overlap">you both: ${esc(shared.slice(0, 3).join(" · "))}</span>`
-      : esc((k.sports || []).slice(0, 3).join(" · "))} · ${esc(area)}</p></div></div>`;
+      : esc((k.sports || []).slice(0, 3).join(" · "))} · ${esc(area)}${
+        [(k.vibe || {}).age, ((k.vibe || {}).gender && (k.vibe || {}).gender !== "rather not say") ? (k.vibe || {}).gender : ""]
+          .filter(Boolean).map(x => " · " + esc(x)).join("")}</p></div></div>`;
 }
 
 // ── 웨이브(킨 요청) — 발견 피드에서 연락 시작. 더블 옵트인: 서로 웨이브해야 채팅이 열린다.
@@ -671,6 +676,8 @@ const FEED_SPORTS = ["running", "lifting", "tennis", "swimming", "cycling",
 let feedSport = "";
 let feedLevel = "";
 let feedTime = "";
+let feedAge = "";      // 나이대 ±1 (비슷한 또래)
+let feedGender = "";
 let feedMode = "people";
 window.fitkinFeedTab = function (mode) {
   feedMode = mode;
@@ -684,6 +691,12 @@ window.fitkinFeedTab = function (mode) {
 };
 async function paintMoments() {
   const s = st();
+  const chips3 = $("#feedChips3");
+  if (chips3) chips3.innerHTML =
+    [...AGES.map(a =>
+       `<button class="fchip${feedAge === a ? " sel" : ""}" onclick="fitkinFeedAge('${a}')">${esc(a)}</button>`),
+     ...GENDERS.map(g =>
+       `<button class="fchip${feedGender === g ? " sel" : ""}" onclick="fitkinFeedGender('${g}')">${esc(g)}</button>`)].join("");
   const sub = $("#feedSub");
   if (sub) sub.textContent = `workout moments around ${s.zip ? s.zip.slice(0, 3) + "xx" : "your area"} — kin sharing the grind.`;
   const wrap = $("#feedList"); if (!wrap) return;
@@ -743,6 +756,8 @@ window.fitkinFeedClose = function () { $("#feed").classList.remove("on"); };
 window.fitkinFeedFilter = function (sp) { feedSport = sp === feedSport ? "" : sp; paintFeed(); };
 window.fitkinFeedLevel = function (lv) { feedLevel = lv === feedLevel ? "" : lv; paintFeed(); };
 window.fitkinFeedTime = function (t) { feedTime = t === feedTime ? "" : t; paintFeed(); };
+window.fitkinFeedAge = function (a) { feedAge = a === feedAge ? "" : a; paintFeed(); };
+window.fitkinFeedGender = function (g) { feedGender = g === feedGender ? "" : g; paintFeed(); };
 async function paintFeed() {
   if (feedMode === "moments") return paintMoments();
   const s = st();
@@ -757,6 +772,12 @@ async function paintFeed() {
        `<button class="fchip${feedLevel === lv ? " sel" : ""}" onclick="fitkinFeedLevel('${lv}')">${esc(lv)}</button>`),
      ...[["🌅 mornings", "🌅"], ["☀️ daytime", "☀️"], ["🌙 nights", "🌙"]].map(([t, ico]) =>
        `<button class="fchip${feedTime === t ? " sel" : ""}" onclick="fitkinFeedTime('${t}')">${ico} ${esc(t.split(" ")[1])}</button>`)].join("");
+  const chips3 = $("#feedChips3");
+  if (chips3) chips3.innerHTML =
+    [...AGES.map(a =>
+       `<button class="fchip${feedAge === a ? " sel" : ""}" onclick="fitkinFeedAge('${a}')">${esc(a)}</button>`),
+     ...GENDERS.map(g =>
+       `<button class="fchip${feedGender === g ? " sel" : ""}" onclick="fitkinFeedGender('${g}')">${esc(g)}</button>`)].join("");
   const sub = $("#feedSub");
   if (sub) sub.textContent = s.zip
     ? `kin in ${s.zip} and nearby (${s.zip.slice(0, 3)}xx) — tap a sport to filter.`
@@ -770,7 +791,12 @@ async function paintFeed() {
            return (a >= 0 && b >= 0) ? Math.abs(a - b) <= 1
                                      : ((k.vibe || {}).level || "").trim() === feedLevel;
          })())
-      && (!feedTime || ((k.vibe || {}).time || "").split(" + ").includes(feedTime));
+      && (!feedTime || ((k.vibe || {}).time || "").split(" + ").includes(feedTime))
+      && (!feedAge || (() => {
+           const a = AGES.indexOf(((k.vibe || {}).age || "")), b = AGES.indexOf(feedAge);
+           return a >= 0 && Math.abs(a - b) <= 1;
+         })())
+      && (!feedGender || ((k.vibe || {}).gender || "") === feedGender);
     const h = hood.filter(flt), n = near.filter(flt);
     const rows = [
       ...h.map(k => personRow(k, s.sports)),

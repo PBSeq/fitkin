@@ -311,6 +311,10 @@
       <div class="seg" data-k="mode"><button>😌 for the joy</button><button>🔥 competitive</button></div></div>
     <div class="opt-group"><div class="opt-label">level</div>
       <div class="seg" data-k="level" style="flex-wrap:wrap"><button>day one</button><button>new-ish</button><button>steady</button><button>serious</button><button>beast mode</button></div></div>
+    <div class="opt-group"><div class="opt-label">age <span style="font-weight:400;text-transform:none">· optional, helps find people your age</span></div>
+      <div class="seg" data-k="age" style="flex-wrap:wrap"><button>18–24</button><button>25–34</button><button>35–44</button><button>45–54</button><button>55+</button></div></div>
+    <div class="opt-group"><div class="opt-label">i am <span style="font-weight:400;text-transform:none">· optional</span></div>
+      <div class="seg" data-k="gender" style="flex-wrap:wrap"><button>woman</button><button>man</button><button>non-binary</button><button>rather not say</button></div></div>
     <div class="cta"><button class="btn" id="b2" disabled onclick="go(3)">next</button></div>
   </section>
 
@@ -508,6 +512,7 @@ function reset(){localStorage.removeItem("fitkin");location.reload()}
   <p class="dimtext" style="font-size:12.5px;margin-top:6px" id="feedSub">everyone near your zip — tap a sport to filter.</p>
   <div class="fchips" id="feedChips"></div>
   <div class="fchips" id="feedChips2" style="padding-top:0"></div>
+  <div class="fchips" id="feedChips3" style="padding-top:0"></div>
   <div id="feedList"><p class="dimtext">loading…</p></div>
 </div>
 <div id="chat">

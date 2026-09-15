@@ -45,7 +45,11 @@ service cloud.firestore {
                     && request.resource.data.days is list
                     && request.resource.data.days.size() <= 7
                     && request.resource.data.vibe is map
-                    && request.resource.data.vibe.keys().hasOnly(['time','mode','level'])
+                    && request.resource.data.vibe.keys().hasOnly(['time','mode','level','age','gender'])
+                    && (!('age' in request.resource.data.vibe)
+                        || request.resource.data.vibe.age in ['18–24','25–34','35–44','45–54','55+'])
+                    && (!('gender' in request.resource.data.vibe)
+                        || request.resource.data.vibe.gender in ['woman','man','non-binary','rather not say'])
                     && (!('time' in request.resource.data.vibe)
                         || (request.resource.data.vibe.time is string && request.resource.data.vibe.time.size() <= 60))   // size()=코드포인트. 다중선택 3개 조인=34cp — 카피 변경 여유
                     && (!('mode' in request.resource.data.vibe)
