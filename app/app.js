@@ -464,13 +464,18 @@ window.fitkinWave = async function (otherId, otherName) {
     (await wavesOut()).add(otherId);
     toast("waved at " + (otherName || "them") + " 👋 — you'll be kin when they wave back");
     paintDiscover(); paintWaves();
-  } catch (e) { toast("couldn't wave — try again online"); }
+  } catch (e) {
+    // 규칙 거부(permission-denied)는 거의 항상 "상대가 나를 차단" — 오프라인 문구로 오안내하지 않는다
+    if (String(e.code).includes("permission-denied")) toast("can't wave at " + (otherName || "them") + " right now");
+    else toast("couldn't wave — try again online");
+  }
 };
 // 웨이브 수락 = 링크 생성 + 양방향 웨이브 정리 → 기존 채팅이 그대로 열린다
 async function acceptWave(otherId, otherName) {
   const linkId = [UID, otherId].sort().join("_");
   await setDoc(doc(db, "links", linkId),
     { a: UID < otherId ? UID : otherId, b: UID < otherId ? otherId : UID, ts: Date.now() });
+  kinCacheBust();
   for (const id of [otherId + "_" + UID, UID + "_" + otherId]) {
     try { await deleteDoc(doc(db, "waves", id)); } catch (e) {}
   }
@@ -895,6 +900,7 @@ async function handleKinLink() {
     const existing = await getDoc(doc(db, "links", linkId));
     if (existing.exists()) { toast("already kin with " + (them.data().name || "them") + " ✓"); paintKin(); return; }
     await setDoc(doc(db, "links", linkId), { a: UID < other ? UID : other, b: UID < other ? other : UID, ts: Date.now() });
+    kinCacheBust();
     const shared = overlap(s.sports, them.data().sports);
     toast("you're kin with " + (them.data().name || "someone") + " 🎉" +
           (shared.length ? " — you both: " + shared.join(" · ") : ""));
@@ -904,8 +910,12 @@ async function handleKinLink() {
 window.addEventListener("hashchange", handleKinLink);
 
 // ── 킨 목록 (탭하면 채팅) ──
+// 캐시: 링크는 웨이브 수락·QR 연결·차단 때만 바뀐다 — 그 지점들이 kinCacheBust()를 부른다 (test-engineer P2)
+let kinCache = null, kinCacheAt = 0;
+function kinCacheBust() { kinCache = null; }
 async function myKin() {
   if (!UID) return [];
+  if (kinCache && Date.now() - kinCacheAt < 30000) return kinCache;
   const [qa, qb] = await Promise.all([
     getDocs(query(collection(db, "links"), where("a", "==", UID), limit(50))),
     getDocs(query(collection(db, "links"), where("b", "==", UID), limit(50)))]);
@@ -916,6 +926,7 @@ async function myKin() {
     const p = await getDoc(doc(db, "profiles", id));
     if (p.exists()) out.push({ id, ...p.data() });
   }
+  kinCache = out; kinCacheAt = Date.now();
   return out;
 }
 
@@ -1080,6 +1091,7 @@ window.fitkinBlock = async function (otherId, otherName) {
   if (!confirm(`block ${otherName}? they won't be able to message you.`)) return;
   try {
     await setDoc(doc(db, "blocks", UID, "users", otherId), { ts: Date.now() });
+    kinCacheBust();
     toast(otherName + " blocked");
     window.fitkinChatClose(); paintKin(); paintDiscover();
   } catch (e) { toast("couldn't block — try again online"); }
