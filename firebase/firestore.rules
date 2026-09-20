@@ -254,6 +254,18 @@ service cloud.firestore {
       allow update: if false;
     }
 
+    // 푸시 토큰 (박사님 지시 09-19): 기기 토큰은 본인만 읽고 쓴다.
+    // 발송 데몬은 관리자 자격으로 읽으므로 클라이언트 교차 열람을 열 필요가 없다.
+    match /pushTokens/{uid} {
+      function mine() { return request.auth != null && request.auth.uid == uid; }
+      allow read, delete: if mine();
+      allow create, update: if mine()
+                            && request.resource.data.keys().hasOnly(['t','ts'])
+                            && request.resource.data.t is map
+                            && request.resource.data.t.keys().size() <= 5
+                            && request.resource.data.ts is number;
+    }
+
     // 신고: 인앱 제출(본인 명의만). 열람은 운영자(관리 토큰)만 — 클라이언트 read 금지.
     match /reports/{id} {
       allow create: if request.auth != null

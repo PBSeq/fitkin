@@ -440,6 +440,52 @@ function personRow(k, mine) {
           .filter(Boolean).map(x => " · " + esc(x)).join("")}</p></div></div>`;
 }
 
+// ── 푸시 알림 (박사님 지시 09-19) ──
+// 권한은 "카드를 만든 뒤"에만 묻는다 — 첫 실행 무맥락 팝업은 거절률이 높고 Apple도 싫어한다.
+// 토큰은 pushTokens/{uid}.t 맵(토큰→플랫폼)에 저장, 발송은 서버 데몬이 한다.
+let pushTried = false;
+function nativePush() {
+  return window.Capacitor && window.Capacitor.isNativePlatform &&
+         window.Capacitor.isNativePlatform() &&
+         window.Capacitor.Plugins && window.Capacitor.Plugins.PushNotifications;
+}
+async function registerPush() {
+  const P = nativePush();
+  if (!P || pushTried || !UID || !st().done) return;
+  pushTried = true;
+  try {
+    let perm = (await P.checkPermissions()).receive;
+    if (perm === "prompt" || perm === "prompt-with-rationale") perm = (await P.requestPermissions()).receive;
+    if (perm !== "granted") return;                       // 거절해도 앱은 그대로 쓴다
+    await P.addListener("registration", async tk => {
+      const token = tk && tk.value; if (!token) return;
+      const plat = (window.Capacitor.getPlatform && window.Capacitor.getPlatform()) || "unknown";
+      try {
+        const cur = await getDoc(doc(db, "pushTokens", UID));
+        const map = (cur.exists() && cur.data().t) || {};
+        if (map[token] === plat) return;                  // 이미 등록된 기기 — 쓰기 생략
+        map[token] = plat;
+        const keys = Object.keys(map).slice(-5);          // 기기 5대 상한(규칙과 일치)
+        const trimmed = {}; keys.forEach(k => trimmed[k] = map[k]);
+        await setDoc(doc(db, "pushTokens", UID), { t: trimmed, ts: Date.now() });
+      } catch (e) {}
+    });
+    await P.addListener("registrationError", () => {});
+    // 알림을 탭하면 그 대화를 연다
+    await P.addListener("pushNotificationActionPerformed", ev => {
+      const d = (ev && ev.notification && ev.notification.data) || {};
+      if (d.kin) setTimeout(() => openChat(d.kin, d.name || "kin"), 300);
+    });
+    // 앱을 보고 있을 땐 시스템 배너 대신 토스트 (iOS는 포그라운드 배너를 안 띄운다)
+    await P.addListener("pushNotificationReceived", n => {
+      const title = (n && (n.title || (n.data || {}).title)) || "new message";
+      toast(title);
+      paintWaves(); paintKin();
+    });
+    await P.register();
+  } catch (e) {}
+}
+
 // ── 웨이브(킨 요청) — 발견 피드에서 연락 시작. 더블 옵트인: 서로 웨이브해야 채팅이 열린다.
 // 일방 DM 금지가 설계 원칙(스토킹·스팸 차단) — 박사님 지시 09-10.
 let myWavesOut = null;          // 내가 보낸 웨이브 대상 Set (캐시)
@@ -1193,6 +1239,7 @@ async function paintHome() {
   ensureDerivedCell().then(ok => { if (ok) { window.fitkinPublish(); paintDiscover(); } });
   paintKin();
   paintDiscover();
+  registerPush();
   if (s.pendingKin) { const p = s.pendingKin; delete s.pendingKin; put(s); location.hash = "#kin=" + p; handleKinLink(); }
 }
 
