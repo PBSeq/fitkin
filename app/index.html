@@ -90,6 +90,9 @@
   /* 온보딩 1·2단계만: 선택지가 길어져도 next 가 항상 보이게 하단 고정.
      3단계는 제외 — 위치정보 안내문("exact coordinates never leave your phone")을 가린다(test-engineer P1, 09-24).
      3단계는 스크롤하며 안내문을 읽고 버튼에 닿는 게 맞다. */
+  /* 그라데이션 여백은 터치를 아래 선택지로 통과시키고, 버튼만 터치를 받는다 (SE에서 나이 칸 하단 데드존, test-engineer P2 09-24) */
+  #s1 .cta,#s2 .cta{pointer-events:none}
+  #s1 .cta > *,#s2 .cta > *{pointer-events:auto}
   #s1 .cta,#s2 .cta{position:sticky;bottom:0;z-index:5;
     background:linear-gradient(to bottom,rgba(12,18,14,0),var(--bg) 26%);padding-bottom:6px}
   .btn{width:100%;border:0;background:linear-gradient(180deg,#d8f96a,var(--volt) 55%);color:#0c120e;
