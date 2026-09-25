@@ -451,6 +451,7 @@ async function registerPush() {
     if (perm !== "granted") return;                       // 거절해도 앱은 그대로 쓴다
     await P.addListener("registration", async tk => {
       const token = tk && tk.value; if (!token) return;
+      { const s0 = st(); if (!s0.pushOn) { s0.pushOn = true; put(s0); } }
       const plat = (window.Capacitor.getPlatform && window.Capacitor.getPlatform()) || "unknown";
       // 필드 단위 병합 — 두 기기가 동시에 등록해도 서로의 토큰을 덮어쓰지 않는다 (test-engineer P2)
       const ref = doc(db, "pushTokens", UID);
@@ -482,6 +483,23 @@ async function registerPush() {
     });
     await P.register();
   } catch (e) {}
+}
+
+// ── 빈 반경 (관제탑 경유 09-25: 첫 해외 유저가 "no one around here yet"에서 닫히지 않게) ──
+// 가짜 카드·데모 유저 금지(E-020). 사실(아직 0명)을 말하고, 다시 올 이유 + 지금 할 일을 준다.
+function emptyNearby() {
+  // 약속은 지킬 수 있는 환경에서만: 알림 허용됨 / 앱인데 꺼짐 / 웹(푸시 없음)
+  const line = st().pushOn
+    ? "we'll send you a notification the moment someone nearby joins."
+    : nativePush()
+      ? "turn on notifications for fitkin in Settings and we'll tell you the moment someone nearby joins."
+      : "they'll show up here as soon as they join — get the fitkin app to be notified.";
+  return `<div class="card" style="text-align:center;padding:18px 14px;margin:6px 0">
+    <p style="font-size:26px;margin-bottom:6px">🌱</p>
+    <p><b>you're the first kin in your area.</b></p>
+    <p class="dimtext" style="margin:6px 0 12px">${line}</p>
+    <button class="btn" onclick="if(window.fitkinShare)fitkinShare()">invite a training buddy 👋</button>
+  </div>`;
 }
 
 // ── 웨이브(킨 요청) — 발견 피드에서 연락 시작. 더블 옵트인: 서로 웨이브해야 채팅이 열린다.
@@ -594,7 +612,7 @@ async function paintDiscover() {
     ];
     wrap.innerHTML = rows.length
       ? rows.join("") + `<p class="dimtext" style="margin-top:10px">see someone at the gym? scan their kin code to connect.</p>`
-      : `<p class="dimtext">no one around here yet — you're first. share fitkin with your crew.</p>`;
+      : emptyNearby();
     decorateRows(wrap); decorateWaveButtons(wrap);
   } catch (e) { wrap.innerHTML = `<p class="dimtext">couldn't load nearby kin — check connection.</p>`; }
 }
@@ -855,7 +873,7 @@ async function paintFeed() {
       ? rows.join("")
       : `<p class="dimtext">${feedSport
           ? `no ${esc(feedSport)} kin around here yet — clear the filter or share fitkin with your crew.`
-          : `no one around here yet — you're first. share fitkin with your crew.`}</p>`;
+          : `no one around here yet.`}</p>` + (feedSport ? "" : emptyNearby());
     if (rows.length) { decorateRows(wrap); decorateWaveButtons(wrap); }
   } catch (e) { wrap.innerHTML = `<p class="dimtext">couldn't load the feed — check connection.</p>`; }
 }
