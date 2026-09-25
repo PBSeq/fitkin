@@ -460,15 +460,21 @@ async function registerPush() {
     await P.addListener("registration", async tk => {
       const token = tk && tk.value; if (!token) return;
       const plat = (window.Capacitor.getPlatform && window.Capacitor.getPlatform()) || "unknown";
+      // 필드 단위 병합 — 두 기기가 동시에 등록해도 서로의 토큰을 덮어쓰지 않는다 (test-engineer P2)
+      const ref = doc(db, "pushTokens", UID);
       try {
-        const cur = await getDoc(doc(db, "pushTokens", UID));
-        const map = (cur.exists() && cur.data().t) || {};
-        if (map[token] === plat) return;                  // 이미 등록된 기기 — 쓰기 생략
-        map[token] = plat;
-        const keys = Object.keys(map).slice(-5);          // 기기 5대 상한(규칙과 일치)
-        const trimmed = {}; keys.forEach(k => trimmed[k] = map[k]);
-        await setDoc(doc(db, "pushTokens", UID), { t: trimmed, ts: Date.now() });
-      } catch (e) {}
+        await setDoc(ref, { t: { [token]: plat }, ts: Date.now() }, { merge: true });
+      } catch (e) {
+        // 규칙의 5대 상한에 걸리면(6번째 기기) 그때만 읽어서 가장 오래된 토큰을 밀어낸다
+        try {
+          const cur = await getDoc(ref);
+          const map = (cur.exists() && cur.data().t) || {};
+          map[token] = plat;
+          const keys = Object.keys(map).slice(-5);
+          const trimmed = {}; keys.forEach(k => trimmed[k] = map[k]);
+          await setDoc(ref, { t: trimmed, ts: Date.now() });
+        } catch (e2) {}
+      }
     });
     await P.addListener("registrationError", () => {});
     // 알림을 탭하면 그 대화를 연다
