@@ -87,8 +87,10 @@
   .day.sel{background:var(--volt);border-color:var(--volt);color:#0c120e;box-shadow:var(--glow);transform:scale(1.08)}
 
   .cta{margin-top:auto;padding-top:22px}
-  /* 온보딩(1~3단계)만: 내용이 길어져도 다음 버튼이 항상 보이게 하단 고정 */
-  #s1 .cta,#s2 .cta,#s3 .cta{position:sticky;bottom:0;z-index:5;
+  /* 온보딩 1·2단계만: 선택지가 길어져도 next 가 항상 보이게 하단 고정.
+     3단계는 제외 — 위치정보 안내문("exact coordinates never leave your phone")을 가린다(test-engineer P1, 09-24).
+     3단계는 스크롤하며 안내문을 읽고 버튼에 닿는 게 맞다. */
+  #s1 .cta,#s2 .cta{position:sticky;bottom:0;z-index:5;
     background:linear-gradient(to bottom,rgba(12,18,14,0),var(--bg) 26%);padding-bottom:6px}
   .btn{width:100%;border:0;background:linear-gradient(180deg,#d8f96a,var(--volt) 55%);color:#0c120e;
        font-family:inherit;font-size:17.5px;font-weight:700;padding:17px;border-radius:99px;cursor:pointer;
