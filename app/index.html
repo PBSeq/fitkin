@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>fitkin</title>
+<meta name="description" content="find your fitness kin — workout people matched by neighborhood, schedule, level, and vibe.">
+<link rel="manifest" href="manifest.json">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet"
+      media="print" onload="this.media='all'">
+<meta name="theme-color" content="#0c120e">
+<style>
+  :root{
+    --bg:#0c120e; --card:#141c16; --card2:#1a241c; --ink:#f2f8ee; --dim:#8aa393;
+    --volt:#ccf24e; --volt-deep:#9fc72e; --mint:#bfe8cd; --line:#26332a;
+    --r:28px; --glow:0 0 34px rgba(204,242,78,.16);
+    --spring:cubic-bezier(.34,1.56,.64,1);
+    --press:0 5px 0 var(--volt-deep);
+    --cardhi:inset 0 1px 0 rgba(255,255,255,.045);
+  }
+  *{margin:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%}
+  body{font-family:'Space Grotesk',-apple-system,'SF Pro Text',Roboto,sans-serif;
+       background:var(--bg);color:var(--ink);line-height:1.5;
+       display:flex;justify-content:center}
+  body::after{content:"";position:fixed;top:-220px;left:50%;transform:translateX(-50%);
+       width:560px;height:420px;pointer-events:none;z-index:0;
+       background:radial-gradient(closest-side,rgba(204,242,78,.075),transparent 70%)}
+  /* 필름 그레인 */
+  body::before{content:"";position:fixed;inset:0;pointer-events:none;opacity:.5;z-index:9;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence baseFrequency='.85' numOctaves='2'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .04 0'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E")}
+  #phone{width:100%;max-width:430px;min-height:100dvh;display:flex;flex-direction:column;
+         padding:max(18px,env(safe-area-inset-top)) 20px calc(18px + env(safe-area-inset-bottom))}
+  .screen{display:none;flex-direction:column;flex:1;animation:in .35s ease}
+  .screen.on{display:flex}
+  @keyframes in{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+
+  .logo{font-weight:700;font-size:22px;letter-spacing:-.4px}
+  .stik{display:inline-flex;align-items:center;justify-content:center;width:78px;height:78px;
+        background:linear-gradient(160deg,var(--card2),var(--card));border:1px solid var(--line);
+        border-radius:24px;box-shadow:var(--cardhi),0 10px 24px rgba(0,0,0,.35);
+        transform:rotate(var(--rot));animation:floaty 3.6s ease-in-out var(--d) infinite}
+  @keyframes floaty{0%,100%{transform:rotate(var(--rot)) translateY(0)}50%{transform:rotate(var(--rot)) translateY(-7px)}}
+  .logo b{color:var(--volt);text-shadow:0 0 16px rgba(204,242,78,.35)}
+  h1{font-size:clamp(36px,10vw,50px);font-weight:700;letter-spacing:-2px;line-height:.98;
+     margin:14px 0 12px;text-transform:lowercase;position:relative}
+  h1::before{content:"";position:absolute;top:-60px;left:-40px;width:240px;height:200px;
+     background:radial-gradient(closest-side,rgba(204,242,78,.13),transparent);pointer-events:none}
+  h1 em{font-style:normal;background:linear-gradient(100deg,var(--volt),var(--mint));
+     -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+  .sub{color:var(--dim);font-size:16.5px}
+  .step-tag{display:inline-block;background:var(--volt);color:#0c120e;
+            font-size:13px;font-weight:700;border-radius:99px;padding:4px 14px;margin:18px 0 4px}
+
+  /* 마퀴 */
+  .mq{overflow:hidden;white-space:nowrap;border-top:1px solid var(--line);border-bottom:1px solid var(--line);
+      padding:9px 0;margin:20px -20px 0;font-weight:700;font-size:14px;letter-spacing:2.5px;color:var(--mint)}
+  .mq div b{color:var(--volt)}
+  .mq div{display:inline-block;animation:mq 18s linear infinite}
+  @keyframes mq{to{transform:translateX(-50%)}}
+
+  .chips{display:flex;flex-wrap:wrap;gap:10px;margin:18px 0}
+  .chip{border:1.5px solid var(--line);background:var(--card);border-radius:99px;
+        padding:11px 18px;font-size:15.5px;font-weight:600;color:var(--ink);
+        cursor:pointer;transition:transform .25s var(--spring),background .15s,border-color .15s;user-select:none}
+  .chip:active{transform:scale(.92)}
+  .chip.sel{background:var(--volt);border-color:var(--volt);color:#0c120e;
+            box-shadow:var(--glow);transform:rotate(-1.2deg) scale(1.06)}
+
+  .opt-group{margin:16px 0}
+  .opt-label{font-size:12.5px;font-weight:700;color:var(--dim);text-transform:uppercase;
+             letter-spacing:1.4px;margin-bottom:8px}
+  .seg{display:flex;background:var(--card);border:1.5px solid var(--line);
+       border-radius:16px;padding:4px;gap:4px}
+  .seg button{flex:1;border:0;background:none;border-radius:12px;padding:12px 6px;
+              font-family:inherit;font-size:14.5px;font-weight:600;color:var(--dim);cursor:pointer;transition:.15s}
+  .seg button:active{transform:scale(.95)}
+  .seg button.sel{background:var(--volt);color:#0c120e;box-shadow:0 2px 8px rgba(204,242,78,.28)}
+
+  .grid7{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-top:8px}
+  .day{min-width:44px;min-height:44px;border-radius:14px;border:1.5px solid var(--line);background:var(--card);
+       font-family:inherit;font-size:13px;font-weight:700;color:var(--dim);cursor:pointer;
+       transition:transform .25s var(--spring),background .15s,border-color .15s;
+       display:flex;align-items:center;justify-content:center}
+  .day:active{transform:scale(.88)}
+  .day.sel{background:var(--volt);border-color:var(--volt);color:#0c120e;box-shadow:var(--glow);transform:scale(1.08)}
+
+  .cta{margin-top:auto;padding-top:22px}
+  /* 온보딩 1·2단계만: 선택지가 길어져도 next 가 항상 보이게 하단 고정.
+     3단계는 제외 — 위치정보 안내문("exact coordinates never leave your phone")을 가린다(test-engineer P1, 09-24).
+     3단계는 스크롤하며 안내문을 읽고 버튼에 닿는 게 맞다. */
+  /* 그라데이션 여백은 터치를 아래 선택지로 통과시키고, 버튼만 터치를 받는다 (SE에서 나이 칸 하단 데드존, test-engineer P2 09-24) */
+  #s1 .cta,#s2 .cta{pointer-events:none}
+  #s1 .cta > *,#s2 .cta > *{pointer-events:auto}
+  #s1 .cta,#s2 .cta{position:sticky;bottom:0;z-index:5;
+    background:linear-gradient(to bottom,rgba(12,18,14,0),var(--bg) 26%);padding-bottom:6px}
+  .btn{width:100%;border:0;background:linear-gradient(180deg,#d8f96a,var(--volt) 55%);color:#0c120e;
+       font-family:inherit;font-size:17.5px;font-weight:700;padding:17px;border-radius:99px;cursor:pointer;
+       box-shadow:var(--press),var(--glow);transition:transform .1s,box-shadow .1s;
+       position:relative;overflow:hidden}
+  .btn:not(:disabled)::after{content:"";position:absolute;top:0;bottom:0;left:-60px;width:46px;
+       background:linear-gradient(105deg,transparent,rgba(255,255,255,.5),transparent);
+       animation:shine 3.4s ease-in-out infinite}
+  @keyframes shine{0%,72%{left:-60px}100%{left:calc(100% + 20px)}}
+  .btn:active:not(:disabled){transform:translateY(4px);box-shadow:0 1px 0 var(--volt-deep),var(--glow)}
+  .btn:disabled{opacity:.25;box-shadow:none}
+  .btn.ghost{background:none;color:var(--dim);box-shadow:none;font-weight:600;padding:12px}
+
+  .card{background:linear-gradient(180deg,var(--card2) 0%,var(--card) 22%);
+        border:1px solid var(--line);border-radius:var(--r);
+        padding:20px 22px;margin:12px 0;box-shadow:var(--cardhi),0 10px 30px rgba(0,0,0,.28);
+        animation:cardin .5s var(--spring) backwards}
+  .card:nth-of-type(3){animation-delay:.06s}
+  .card:nth-of-type(4){animation-delay:.12s}
+  .card:nth-of-type(5){animation-delay:.18s}
+  @keyframes cardin{from{opacity:0;transform:translateY(16px) scale(.985)}to{opacity:1;transform:none}}
+  .me{display:flex;gap:14px;align-items:center}
+  .ava{width:58px;height:58px;border-radius:19px;background:var(--card2);
+       border:2px solid transparent;
+       background:linear-gradient(var(--card2),var(--card2)) padding-box,
+                  conic-gradient(from 210deg,var(--volt),var(--mint),var(--volt-deep),var(--volt)) border-box;
+       display:flex;align-items:center;justify-content:center;font-size:26px;transform:rotate(-4deg);
+       box-shadow:0 4px 16px rgba(204,242,78,.14)}
+  .me h3{font-size:18px;letter-spacing:-.3px}
+  .me p{font-size:14px;color:var(--dim)}
+  .tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
+  .tag{background:var(--card2);color:var(--mint);font-size:13px;font-weight:600;
+       border:1px solid var(--line);border-radius:99px;padding:4px 12px}
+  .tags .tag:nth-child(3n+1){color:var(--volt);border-color:rgba(204,242,78,.25)}
+  .tags .tag:nth-child(3n+3){color:#a9d5ff;border-color:rgba(169,213,255,.18)}
+
+  .pulse{width:110px;height:110px;margin:20px auto 8px;border-radius:50%;
+         background:var(--card2);border:1.5px solid var(--line);display:flex;align-items:center;
+         justify-content:center;font-size:48px;position:relative}
+  .pulse::after{content:"";position:absolute;inset:-14px;border-radius:50%;
+                border:1.5px solid var(--volt);opacity:.4;animation:pp 2s ease-out infinite}
+  @keyframes pp{from{transform:scale(.8);opacity:.55}to{transform:scale(1.28);opacity:0}}
+  .count{text-align:center}
+  .count b{font-size:30px;letter-spacing:-1px;color:var(--volt)}
+  .count p{color:var(--dim);font-size:15px}
+
+  .qr{display:flex;gap:16px;align-items:center}
+  .qrail{display:flex;gap:12px;overflow-x:auto;padding:12px 2px;scroll-snap-type:x mandatory;
+         -webkit-overflow-scrolling:touch;scrollbar-width:none}
+  .qrail::-webkit-scrollbar{display:none}
+  .qslide{flex:none;scroll-snap-align:start;text-align:center;cursor:pointer;
+          transition:transform .2s var(--spring)}
+  .qslide:active{transform:scale(.96)}
+  .qslide .qbox{width:clamp(118px,36vw,150px);aspect-ratio:1;height:auto;border-radius:20px;background:#fff;padding:8px;
+        border:2px solid transparent;
+        background:linear-gradient(#fff,#fff) padding-box,
+                   conic-gradient(from 140deg,var(--volt),var(--mint),var(--volt)) border-box;
+        box-shadow:0 8px 22px rgba(0,0,0,.35)}
+  .qslide .qbox svg{width:100%;height:100%;border-radius:12px}
+  .qslide .qlabel{margin-top:8px;font-size:13.5px;font-weight:700;color:var(--mint)}
+  #qrZoom{position:fixed;inset:0;background:rgba(8,12,9,.94);backdrop-filter:blur(8px);z-index:70;
+          display:none;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:24px}
+  #qrZoom.on{display:flex;animation:up .3s var(--spring)}
+  #qrZoom .zbox{width:min(82vw,360px);aspect-ratio:1;background:#fff;border-radius:28px;padding:16px;
+          box-shadow:0 0 60px rgba(204,242,78,.25)}
+  #qrZoom .zbox svg{width:100%;height:100%}
+  #qrZoom .zlabel{font-size:20px;font-weight:700;color:var(--volt)}
+  #qrZoom p{color:var(--dim);font-size:14px}
+  .qrbox{width:96px;height:96px;border-radius:18px;background:#fff;padding:6px;
+         border:2px solid transparent;
+         background:linear-gradient(#fff,#fff) padding-box,
+                    conic-gradient(from 140deg,var(--volt),var(--mint),var(--volt)) border-box;
+         display:flex;align-items:center;justify-content:center;
+         font-size:30px;flex:none;transform:rotate(3deg);
+         box-shadow:0 8px 22px rgba(0,0,0,.35),0 0 24px rgba(204,242,78,.12)}
+  .qrbox canvas,.qrbox img{border-radius:10px}
+  .qr h3{font-size:17px}
+  .qr p{font-size:13.5px;color:var(--dim)}
+  .soon{display:inline-block;background:var(--card2);border:1px solid var(--line);color:var(--mint);
+        font-size:11.5px;font-weight:700;letter-spacing:1px;border-radius:99px;padding:2px 10px;
+        text-transform:uppercase;margin-top:6px}
+  .field{width:100%;background:var(--card);border:1.5px solid var(--line);border-radius:14px;
+         padding:13px 16px;font-family:inherit;font-size:16px;color:var(--ink);outline:none}
+  .field:focus{border-color:var(--volt);box-shadow:0 0 0 3px rgba(204,242,78,.12)}
+  .kinrow{display:flex;gap:12px;align-items:center;padding:10px 12px;margin:6px -6px;
+          background:var(--card2);border:1px solid transparent;border-radius:18px;
+          box-shadow:var(--cardhi);transition:transform .2s var(--spring),border-color .15s;cursor:pointer}
+  .kinrow:active{transform:scale(.98);border-color:var(--line)}
+  .kava{width:40px;height:40px;border-radius:12px;background:var(--card2);border:1px solid var(--line);
+        display:flex;align-items:center;justify-content:center;font-size:19px}
+  .kinrow p{font-size:13px;color:var(--dim)}
+  .dimtext{color:var(--dim);font-size:14.5px}
+  #toast{position:fixed;left:50%;bottom:36px;transform:translate(-50%,26px) scale(.9);background:var(--volt);
+         color:#0c120e;font-weight:700;font-size:15px;padding:12px 22px;border-radius:99px;
+         opacity:0;pointer-events:none;transition:transform .4s var(--spring),opacity .2s;z-index:99;
+         max-width:88vw;text-align:center;box-shadow:0 8px 30px rgba(204,242,78,.3)}
+  #toast.show{opacity:1;transform:translate(-50%,0) scale(1)}
+  .scanbtn{margin-top:10px;background:var(--card2);border:1.5px solid var(--line);color:var(--mint);
+           font-family:inherit;font-size:15px;font-weight:700;border-radius:99px;
+           padding:13px 20px;min-height:44px;cursor:pointer;transition:transform .2s var(--spring)}
+  .scanbtn:active{transform:scale(.94)}
+  .loginrow{display:flex;flex-direction:column;gap:10px;margin-top:12px}
+  .lbtn{background:var(--card);border:1.5px solid var(--line);color:var(--ink);white-space:nowrap;
+        font-family:inherit;font-size:15px;font-weight:700;border-radius:99px;padding:13px;cursor:pointer}
+  .lbtn:active{transform:scale(.97)}
+  .gmark{display:inline-block;background:#fff;color:#1f1f1f;border-radius:50%;
+         width:20px;height:20px;line-height:20px;text-align:center;font-weight:800;font-size:13px}
+  .amark{font-family:-apple-system,'SF Pro Text',system-ui;font-size:17px;line-height:1;vertical-align:-1px;margin-right:2px}
+  #scanner{position:fixed;inset:0;background:#000c;backdrop-filter:blur(6px);z-index:50;
+           display:none;flex-direction:column;align-items:center;justify-content:center;gap:18px}
+  #scanner.on{display:flex}
+  #scanner video{width:min(86vw,380px);aspect-ratio:1;object-fit:cover;border-radius:24px;
+                 border:2px solid var(--volt)}
+  #scanner p{color:var(--mint);font-weight:700}
+  #scanner .btn{width:min(86vw,380px)}
+  .overlap{color:var(--volt);font-weight:700}
+  #feed{position:fixed;inset:0;background:var(--bg);z-index:55;display:none;flex-direction:column;
+        padding:max(18px,env(safe-area-inset-top)) 18px calc(14px + env(safe-area-inset-bottom));
+        max-width:430px;margin:0 auto}
+  #feed.on{display:flex;animation:up .35s var(--spring)}
+  @keyframes up{from{opacity:0;transform:translateY(26px)}to{opacity:1;transform:none}}
+  #feedList{flex:1;overflow-y:auto;margin-top:10px}
+  .fchips{display:flex;gap:8px;overflow-x:auto;padding:10px 0 4px;flex:none;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+  .fchips::-webkit-scrollbar{display:none}
+  .fchip{flex:none;border:1.5px solid var(--line);background:var(--card);border-radius:99px;
+         padding:11px 15px;min-height:44px;font-family:inherit;font-size:14px;font-weight:600;color:var(--ink);cursor:pointer;
+         transition:transform .25s var(--spring),background .15s}
+  .fchip:active{transform:scale(.9)}
+  .fchip.sel{background:var(--volt);border-color:var(--volt);color:#0c120e;transform:scale(1.05)}
+  #review{position:fixed;inset:0;background:var(--bg);z-index:58;display:none;flex-direction:column;
+          padding:max(18px,env(safe-area-inset-top)) 18px calc(14px + env(safe-area-inset-bottom));
+          max-width:430px;margin:0 auto;overflow-y:auto}
+  #review.on{display:flex;animation:up .35s var(--spring)}
+  .rvstar{background:none;border:0;font-size:38px;color:var(--line);cursor:pointer;padding:2px 6px;
+          font-family:inherit;transition:transform .3s var(--spring),color .15s}
+  .rvstar:active{transform:scale(.8)}
+  .rvstar.sel{color:var(--volt);text-shadow:0 0 18px rgba(204,242,78,.4);transform:scale(1.15) rotate(-8deg)}
+  .rvbadge{color:var(--volt);font-weight:600}
+  .moment{background:var(--card);border:1px solid var(--line);border-radius:var(--r);
+          overflow:hidden;margin:12px 0}
+  .moment img{width:100%;display:block;max-height:420px;object-fit:cover}
+  .moment-meta{display:flex;align-items:center;gap:8px;padding:10px 14px;font-size:13.5px;color:var(--dim)}
+  .moment-meta b{color:var(--ink)}
+  #chat{position:fixed;inset:0;background:var(--bg);z-index:60;display:none;flex-direction:column;
+        padding:max(18px,env(safe-area-inset-top)) 18px calc(14px + env(safe-area-inset-bottom));
+        max-width:430px;margin:0 auto}
+  #chat.on{display:flex;animation:up .35s var(--spring)}
+  .chat-head{display:flex;align-items:center;justify-content:space-between;
+             border-bottom:1px solid var(--line);padding-bottom:10px}
+  .chat-head b{font-size:19px}
+  #chatMsgs{flex:1;overflow-y:auto;padding:14px 2px;display:flex;flex-direction:column;gap:8px}
+  .msg{background:var(--card);border:1px solid var(--line);border-radius:16px 16px 16px 4px;
+       padding:10px 15px;font-size:15.5px;max-width:80%;align-self:flex-start;word-break:break-word}
+  .msg.me{background:linear-gradient(115deg,var(--volt),#b8ea6a);color:#0c120e;border:0;
+          border-radius:16px 16px 4px 16px;align-self:flex-end;font-weight:600;
+          box-shadow:0 4px 14px rgba(204,242,78,.18)}
+  .chat-input{display:flex;gap:8px;padding-top:8px}
+  .chat-input .field{flex:1}
+  .chat-act{background:none;border:1px solid var(--line);color:var(--dim);font-family:inherit;
+            font-size:13.5px;font-weight:700;border-radius:99px;padding:12px 16px;
+            min-height:44px;cursor:pointer;margin-right:4px}
+  @media (prefers-reduced-motion:reduce){
+    *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
+    .btn::after{display:none}
+  }
+</style>
+</head>
+<body>
+<div id="phone">
+
+  <!-- 0 · Welcome -->
+  <section class="screen on" id="s0">
+    <div class="logo"><img src="../mark.png" alt="" style="height:26px;vertical-align:-5px;margin-right:6px">fit<b>kin</b></div>
+    <div style="margin:auto 0;padding:28px 0">
+      <div style="margin-bottom:18px;display:flex;gap:10px;align-items:center">
+        <span class="stik" style="--rot:-9deg;--d:0s;font-size:44px">🏃‍♀️</span>
+        <span class="stik" style="--rot:4deg;--d:.4s;font-size:54px">🤝</span>
+        <span class="stik" style="--rot:10deg;--d:.8s;font-size:44px">🏊‍♂️</span></div>
+      <h1>find your <em>fitness kin.</em></h1>
+      <p class="sub">your people are already out there — running, lifting,
+      swimming at 6am. we just introduce you.</p>
+      <div class="mq"><div>RUN&nbsp;·&nbsp;LIFT&nbsp;·&nbsp;SWIM&nbsp;·&nbsp;CLIMB&nbsp;·&nbsp;REPEAT&nbsp;·&nbsp;RUN&nbsp;·&nbsp;LIFT&nbsp;·&nbsp;SWIM&nbsp;·&nbsp;CLIMB&nbsp;·&nbsp;REPEAT&nbsp;·&nbsp;</div></div>
+    </div>
+    <div class="cta">
+      <button class="btn" onclick="go(1)">let's go</button>
+      <div class="loginrow" id="loginRow">
+        <button class="lbtn" onclick="fitkinLogin('apple')"><span class="amark">&#xF8FF;</span> Continue with Apple</button>
+        <button class="lbtn" onclick="fitkinLogin('google')"><span class="gmark">G</span> Continue with Google</button>
+      </div>
+      <script>/* v1.1: 네이티브에서 애플+구글 로그인 점화 (심사규정 4.8 충족 — 애플 로그인 동시 제공).
+      네이티브에선 외부 웨이트리스트 CTA 와 사이트 이동 버튼을 숨긴다 (외부 링크 최소화 — 심사 마찰 제거) */
+      if(window.Capacitor&&window.Capacitor.getPlatform&&window.Capacitor.getPlatform()==='android'){
+        /* 안드로이드: 애플 로그인 의무 없음 + 애플 글리프 미지원 — 애플 버튼 숨김 */
+        addEventListener('DOMContentLoaded',()=>document.querySelectorAll('.lbtn').forEach(b=>{
+          if(b.textContent.includes('Apple'))b.style.display='none'}));
+      }
+      if(window.Capacitor||navigator.userAgent.includes('fitkin-ios')){
+        addEventListener('DOMContentLoaded',()=>document.querySelectorAll('.btn').forEach(b=>{
+          if(b.textContent.includes('founding spot')||b.textContent.includes('what is fitkin'))b.style.display='none'}));
+      }</script>
+      <button class="btn ghost" onclick="location.href='../'">what is fitkin?</button>
+    </div>
+  </section>
+
+  <!-- 1 · Sports -->
+  <section class="screen" id="s1">
+    <div class="logo"><img src="../mark.png" alt="" style="height:26px;vertical-align:-5px;margin-right:6px">fit<b>kin</b></div>
+    <span class="step-tag">1/3 · your things</span>
+    <h1>what moves you?</h1>
+    <p class="sub">pick your things. all of them. no gatekeeping.</p>
+    <div class="chips" id="sports"></div>
+    <div class="cta"><button class="btn" id="b1" disabled onclick="go(2)">next</button></div>
+  </section>
+
+  <!-- 2 · Vibe -->
+  <section class="screen" id="s2">
+    <div class="logo"><img src="../mark.png" alt="" style="height:26px;vertical-align:-5px;margin-right:6px">fit<b>kin</b></div>
+    <span class="step-tag">2/3 · your vibe</span>
+    <h1>how do you move?</h1>
+    <div class="opt-group"><div class="opt-label">when</div>
+      <div class="seg" data-k="time" title="pick all that apply"><button>🌅 mornings</button><button>☀️ daytime</button><button>🌙 nights</button></div></div>
+    <div class="opt-group"><div class="opt-label">energy</div>
+      <div class="seg" data-k="mode"><button>😌 for the joy</button><button>🔥 competitive</button></div></div>
+    <div class="opt-group"><div class="opt-label">level</div>
+      <div class="seg" data-k="level" style="flex-wrap:wrap"><button>day one</button><button>new-ish</button><button>steady</button><button>serious</button><button>beast mode</button></div></div>
+    <div class="opt-group"><div class="opt-label">age <span style="font-weight:400;text-transform:none">· optional, helps find people your age</span></div>
+      <div class="seg" data-k="age" style="flex-wrap:wrap"><button>18–24</button><button>25–34</button><button>35–44</button><button>45–54</button><button>55+</button></div></div>
+    <div class="opt-group"><div class="opt-label">i am <span style="font-weight:400;text-transform:none">· optional</span></div>
+      <div class="seg" data-k="gender" style="flex-wrap:wrap"><button>woman</button><button>man</button><button>non-binary</button><button>rather not say</button></div></div>
+    <div class="cta"><button class="btn" id="b2" disabled onclick="go(3)">next</button></div>
+  </section>
+
+  <!-- 3 · Schedule -->
+  <section class="screen" id="s3">
+    <div class="logo"><img src="../mark.png" alt="" style="height:26px;vertical-align:-5px;margin-right:6px">fit<b>kin</b></div>
+    <span class="step-tag">3/3 · your week</span>
+    <h1>when do you show up?</h1>
+    <p class="sub">tap the days you can usually move.</p>
+    <div class="grid7" id="days"></div>
+    <div class="opt-group" style="margin-top:22px"><div class="opt-label">display name</div>
+      <input class="field" id="fName" maxlength="30" placeholder="what do we call you?"></div>
+    <div class="opt-group"><div class="opt-label">where you work out</div>
+      <input class="field" id="fZip" maxlength="5" inputmode="numeric" pattern="[0-9]*"
+             placeholder="US zip — how we find kin near you">
+      <button class="btn ghost" style="margin-top:8px" type="button"
+              onclick="if(window.fitkinUseLocation)fitkinUseLocation()">&#128205; use my location instead</button>
+      <p style="font-size:11.5px;color:var(--dim);margin-top:6px;line-height:1.45">anywhere in the world —
+        your phone asks for location once, turns it into a rough ~5km area code on-device,
+        and only that area code is stored. your exact coordinates never leave your phone.</p></div>
+    <div class="cta">
+      <button class="btn" id="b3" disabled onclick="finish()">build my kin card</button>
+      <p style="text-align:center;font-size:11.5px;color:var(--dim);margin-top:8px;line-height:1.5">
+        by building your card you agree to the
+        <a href="https://pbseq.github.io/fitkin/terms.html" style="color:var(--mint)">terms</a> &amp;
+        <a href="https://pbseq.github.io/fitkin/privacy.html" style="color:var(--mint)">privacy policy</a> —
+        fitkin introduces people; meetups are at your own risk.</p>
+    </div>
+  </section>
+
+  <!-- 4 · Home -->
+  <section class="screen" id="s4">
+    <div class="logo"><img src="../mark.png" alt="" style="height:26px;vertical-align:-5px;margin-right:6px">fit<b>kin</b></div>
+    <div class="card"><div class="me">
+      <div class="ava" id="hAva" onclick="fitkinSetPhoto()" style="cursor:pointer" title="add a profile photo">🏃</div>
+      <div><h3>your kin card</h3><p id="hLine"></p></div>
+    </div><div class="tags" id="hTags"></div></div>
+
+    <div class="card">
+      <h3 style="font-size:17px;margin-bottom:2px">your kin codes</h3>
+      <p style="font-size:13.5px;color:var(--dim)">met someone at the gym? show the right sport — tap a code to go big for easy scanning. no numbers needed.</p>
+      <div style="display:flex;gap:14px;align-items:center">
+        <div class="qrail" id="qrCanvas" style="flex:1;min-width:0"><span class="dimtext" style="font-size:11px">making your codes…</span></div>
+        <div style="display:flex;flex-direction:column;gap:9px;flex:none">
+          <button class="scanbtn" style="margin-top:0" onclick="fitkinScan()">📷 scan a code</button>
+          <button class="scanbtn" style="margin-top:0" onclick="fitkinShare()">↗ share my link</button></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <h3 style="font-size:17px">📍 kin near you</h3>
+        <span><button class="chat-act" onclick="fitkinArea()">✈️ traveling?</button>
+        <button class="chat-act" onclick="fitkinAreaHome()">🏠</button></span>
+      </div>
+      <p class="dimtext" style="font-size:12.5px;margin-bottom:8px">your kin card (name · sports · area) is visible to other fitkin users — that's how kin find each other.</p>
+      <p id="areaRow" style="font-size:13.5px;font-weight:700;color:var(--volt);margin:2px 0 4px"></p>
+      <p class="dimtext" id="seekRow" style="font-size:12.5px;margin-top:6px"></p>
+      <div id="nearList"><p class="dimtext">finding people in your zip…</p></div>
+      <button class="scanbtn" onclick="fitkinFeed()" style="width:100%">👀 open kin feed — browse everyone</button></div>
+
+    <div class="card"><h3 style="font-size:17px;margin-bottom:8px">your kin</h3>
+      <div id="waveList"></div>
+      <div id="kinList"><p class="dimtext">loading…</p></div></div>
+
+    <div class="cta">
+      <button class="btn" onclick="if(window.fitkinShare)fitkinShare()">
+        invite a friend to train with 👋</button>
+      <button class="btn ghost" onclick="reset()">redo my card</button>
+      <p id="acctRow" style="text-align:center;font-size:13px;color:var(--dim);margin-top:2px"></p>
+      <p style="text-align:center;font-size:12.5px;color:var(--dim);margin-top:6px">
+        <a href="#" onclick="fitkinFeedback();return false" style="color:var(--mint)">report a problem</a> ·
+        <a href="https://pbseq.github.io/fitkin/privacy.html" style="color:var(--mint)">privacy</a> ·
+        <a href="#" onclick="fitkinDelete();return false" style="color:var(--mint)">delete my profile</a></p>
+    </div>
+  </section>
+</div>
+
+<script>
+const SPORTS=[["🏃","running"],["🏋️","lifting"],["🎾","tennis"],["🏊","swimming"],["🚴","cycling"],
+  ["🥾","hiking"],["🧘","yoga"],["🏀","hoops"],["⚽","soccer"],["🏓","pickleball"],
+  ["🥊","boxing"],["🧗","climbing"]];
+const DAYS=["S","M","T","W","T","F","S"];
+const st=JSON.parse(localStorage.getItem("fitkin")||"{}");
+st.sports=st.sports||[]; st.days=st.days||[]; st.vibe=st.vibe||{};
+
+const $=q=>document.querySelector(q);
+function go(n){document.querySelectorAll(".screen").forEach(s=>s.classList.remove("on"));
+  $("#s"+n).classList.add("on");window.scrollTo(0,0);save()}
+function save(){const f=JSON.parse(localStorage.getItem("fitkin")||"{}");
+  if(f.photoData&&!st.photoData)st.photoData=f.photoData;   // 번들이 저장한 프로필 사진 보존
+  ["cell","derivedCell","id","published","homeZip","homeCell","areaName","areaKey","hidden","loginName"].forEach(k=>{if(k in f)st[k]=f[k]});  // 번들 소유 필드 승계
+  localStorage.setItem("fitkin",JSON.stringify(st))}
+
+SPORTS.forEach(([e,n])=>{const c=document.createElement("div");c.className="chip";
+  c.textContent=e+" "+n; if(st.sports.includes(n))c.classList.add("sel");
+  c.onclick=()=>{c.classList.toggle("sel");
+    st.sports=st.sports.includes(n)?st.sports.filter(x=>x!==n):[...st.sports,n];
+    $("#b1").disabled=!st.sports.length;save()};
+  $("#sports").appendChild(c)});
+$("#b1").disabled=!st.sports.length;
+
+document.querySelectorAll(".seg").forEach(seg=>{const k=seg.dataset.k;
+  const multi=k==="time";   // when 은 다중선택 (엔지니어 피드백 #1)
+  [...seg.children].forEach(b=>{
+    const sel=multi?(st.vibe[k]||"").split(" + ").includes(b.textContent):st.vibe[k]===b.textContent;
+    if(sel)b.classList.add("sel");
+    b.onclick=()=>{
+      if(multi){
+        b.classList.toggle("sel");
+        st.vibe[k]=[...seg.children].filter(x=>x.classList.contains("sel")).map(x=>x.textContent).join(" + ");
+      }else{
+        [...seg.children].forEach(x=>x.classList.remove("sel"));
+        b.classList.add("sel");st.vibe[k]=b.textContent;
+      }
+      $("#b2").disabled=!(st.vibe.time&&st.vibe.mode&&st.vibe.level);save()}})});
+$("#b2").disabled=!(st.vibe.time&&st.vibe.mode&&st.vibe.level);
+
+DAYS.forEach((d,i)=>{const b=document.createElement("button");b.className="day";b.textContent=d;
+  if(st.days.includes(i))b.classList.add("sel");
+  b.onclick=()=>{b.classList.toggle("sel");
+    st.days=st.days.includes(i)?st.days.filter(x=>x!==i):[...st.days,i];
+    checkS3();save()};
+  $("#days").appendChild(b)});
+function hasArea(){if(/^[0-9]{5}$/.test($("#fZip").value.trim()))return true;
+  const f=JSON.parse(localStorage.getItem("fitkin")||"{}");
+  return typeof f.cell==="string"&&/^[0-9b-hjkmnp-z]{5}$/.test(f.cell)}
+function checkS3(){$("#b3").disabled=!(st.days.length&&$("#fName").value.trim()&&hasArea())}
+$("#fName").value=st.name||((st.loginName||"").split(" ")[0])||""; $("#fZip").value=st.zip||"";
+$("#fName").oninput=$("#fZip").oninput=checkS3;
+checkS3();
+
+// 렌더(로컬)와 발행(네트워크)을 분리 — 매 로드마다 재발행하지 않는다
+function renderCard(){
+  const em=(SPORTS.find(([e,n])=>n===st.sports[0])||["🏃"])[0];
+  const fresh=JSON.parse(localStorage.getItem("fitkin")||"{}");
+  if(typeof fresh.photoData==="string"&&/^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(fresh.photoData)){
+    const im=document.createElement("img");im.src=fresh.photoData;
+    im.style.cssText="width:100%;height:100%;object-fit:cover;border-radius:16px";
+    $("#hAva").replaceChildren(im);}
+  else if(window.fitkinAvatar&&st.name)
+    $("#hAva").innerHTML='<img src="'+window.fitkinAvatar(st.name,120)+'" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:16px">';
+  else $("#hAva").textContent=em;
+  $("#hLine").textContent=(st.name?st.name+" · ":"")+[st.vibe.time,st.vibe.mode,st.vibe.level].filter(Boolean).join(" · ");
+  $("#hTags").innerHTML=st.sports.map(s=>`<span class="tag">${s}</span>`).join("")
+    +`<span class="tag">${st.days.length} days/week</span>`
+    +(st.zip?`<span class="tag">📍 ${st.zip}</span>`:(JSON.parse(localStorage.getItem("fitkin")||"{}").cell?`<span class="tag">📍 my area</span>`:""));
+  go(4);
+}
+function finish(){
+  st.name=$("#fName").value.trim();
+  const z=$("#fZip").value.trim(); st.zip=/^[0-9]{5}$/.test(z)?z:"";
+  st.done=Date.now();save();renderCard();
+  if(window.fitkinPublish)window.fitkinPublish();   // 최초 발행 (이후 로드는 렌더만)
+}
+if(st.done)renderCard();
+window.renderCard=renderCard;   // 번들이 프로필 사진 갱신 후 재도색할 수 있게
+function reset(){localStorage.removeItem("fitkin");location.reload()}
+</script>
+<div id="qrZoom" onclick="this.classList.remove('on')">
+  <div class="zlabel" id="qzLabel"></div>
+  <div class="zbox" id="qzBox"></div>
+  <p>have them scan this — tap anywhere to close</p>
+</div>
+<div id="scanner"><p>point at a kin code</p><video id="scanVid" playsinline></video>
+  <button class="btn ghost" onclick="fitkinScanStop()">cancel</button></div>
+<div id="review">
+  <div class="chat-head">
+    <b>★ rate <span id="rvName">kin</span></b>
+    <button class="chat-act" onclick="fitkinReviewClose()" aria-label="close">✕</button>
+  </div>
+  <p class="dimtext" style="font-size:12.5px;margin-top:6px">for kin you've actually met. your review
+  goes live when they review you back, or in 14 days. bad experience? use report or block instead.</p>
+  <div id="rvStars" style="text-align:center;margin:14px 0 4px"></div>
+  <p class="opt-label" style="margin-top:12px">WHAT MADE IT GOOD</p>
+  <div class="fchips" id="rvTags" style="flex-wrap:wrap;overflow:visible"></div>
+  <p class="opt-label" style="margin-top:12px">THEIR LEVEL FELT LIKE (OPTIONAL)</p>
+  <div class="fchips" id="rvLevels"></div>
+  <p class="opt-label" style="margin-top:12px">A WORD FOR THEM (OPTIONAL)</p>
+  <input class="field" id="rvComment" maxlength="140" placeholder="great tempo, showed up early…">
+  <div class="cta"><button class="btn" id="rvSubmit" disabled onclick="fitkinReviewSubmit()">post review</button></div>
+</div>
+<div id="feed">
+  <div class="chat-head">
+    <b>👀 kin feed</b>
+    <span style="display:flex;align-items:center;gap:6px">
+      <button class="chat-act" onclick="fitkinArea()">✈️ area</button>
+      <button class="chat-act" onclick="fitkinFeedClose()" aria-label="close">✕</button>
+    </span></div>
+  <div style="display:flex;gap:8px;margin-top:10px;flex:none">
+    <button class="fchip sel" id="ftabPeople" onclick="fitkinFeedTab('people')">👥 people</button>
+    <button class="fchip" id="ftabMoments" onclick="fitkinFeedTab('moments')">📸 moments</button>
+    <button class="fchip" id="fShare" onclick="fitkinMoment()" style="margin-left:auto;display:none">+ share</button>
+  </div>
+  <p class="dimtext" style="font-size:12.5px;margin-top:6px" id="feedSub">everyone near your zip — tap a sport to filter.</p>
+  <div class="fchips" id="feedChips"></div>
+  <div class="fchips" id="feedChips2" style="padding-top:0"></div>
+  <div class="fchips" id="feedChips3" style="padding-top:0"></div>
+  <div id="feedList"><p class="dimtext">loading…</p></div>
+</div>
+<div id="chat">
+  <div class="chat-head">
+    <b id="chatName" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:38vw">kin</b>
+    <span style="display:flex;align-items:center;gap:6px">
+      <button class="chat-act" id="chatReport">report</button>
+      <button class="chat-act" id="chatBlock">block</button>
+      <button class="chat-act" onclick="fitkinChatClose()" aria-label="close">✕</button>
+    </span></div>
+  <div id="chatMsgs"></div>
+  <div class="chat-input">
+    <input class="field" id="chatInput" maxlength="200" placeholder="plan a workout…">
+    <button class="btn" id="chatSend" style="width:auto;padding:13px 22px">send</button>
+  </div>
+</div>
+<script src="lib/qrcode.min.js"></script>
+<script src="lib/jsQR.js"></script>
+<script src="bundle.js"></script>
+</body>
+</html>
