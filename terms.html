@@ -3,11 +3,24 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>fitkin — terms of use</title>
+<script>/* 글자 크기 = 시스템 배율 × 앱 내 4단계 (디자인 명령서 09-30 §1·§5). 첫 페인트 전 적용(CLS 0).
+   iOS: -apple-system-body 계산값÷17 = Dynamic Type 배율(1~1.6으로 제한 — 손쉬운 사용 최대에서 화면 붕괴 방지).
+   Android Capacitor: WebView가 이미 시스템 배율을 반영(에뮬 실측 09-30) → 1. */
+(function(){var H=document.documentElement,s=1,t="";try{t=localStorage.getItem("fitkinTextScale")||""}catch(e){}
+if(t)H.setAttribute("data-text-scale",t);
+try{if(window.CSS&&CSS.supports("font","-apple-system-body")){var p=document.createElement("span");p.style.font="-apple-system-body";
+H.appendChild(p);s=parseFloat(getComputedStyle(p).fontSize)/17||1;H.removeChild(p)}}catch(e){}
+H.style.setProperty("--sys",Math.max(1,Math.min(s,1.6)))})();</script>
 <style>
+  html{font-size:100%;--sys:1;--user:1;--ts:min(calc(var(--sys)*var(--user)),1.6)}
+  html[data-text-scale=sm]{--user:.9} html[data-text-scale=lg]{--user:1.15} html[data-text-scale=xl]{--user:1.3}
+  :root{--fs-xs:calc(.75rem*var(--ts));--fs-sm:calc(.875rem*var(--ts));--fs-base:calc(1rem*var(--ts));--fs-md:calc(1.0625rem*var(--ts));
+        --fs-lg:calc(1.1875rem*var(--ts));--fs-xl:calc(1.25rem*var(--ts));--fs-2xl:calc(1.5rem*var(--ts));--fs-3xl:calc(1.625rem*var(--ts))}
+
   body{font-family:-apple-system,'Space Grotesk',sans-serif;background:#0c120e;color:#f2f8ee;
        line-height:1.7;max-width:640px;margin:0 auto;padding:48px 24px}
-  h1{letter-spacing:-1px} h2{margin-top:28px;font-size:19px;color:#ccf24e}
-  p,li{color:#bfd3c6;font-size:16px} a{color:#ccf24e}
+  h1{letter-spacing:-1px} h2{margin-top:28px;font-size:var(--fs-lg);color:#ccf24e}
+  p,li{color:#bfd3c6;font-size:var(--fs-base);max-width:65ch} a{color:#ccf24e}
 </style>
 </head>
 <body>
