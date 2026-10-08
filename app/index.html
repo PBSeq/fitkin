@@ -141,6 +141,8 @@ H.style.setProperty("--sys",Math.max(1,Math.min(s,1.6)))})();</script>
   .card:nth-of-type(5){animation-delay:.18s}
   @keyframes cardin{from{opacity:0;transform:translateY(16px) scale(.985)}to{opacity:1;transform:none}}
   .me{display:flex;gap:14px;align-items:center}
+  .me > div{min-width:0}
+  .me h3,.me p{overflow-wrap:anywhere}
   .ava{width:58px;height:58px;flex:none;border-radius:var(--r-tile);background:var(--card2);
        border:2px solid transparent;
        background:linear-gradient(var(--card2),var(--card2)) padding-box,
@@ -524,7 +526,7 @@ function renderCard(){
     const n=$("#photoNudge"); if(n) n.style.display=hasPhoto?"none":""; }
   $("#hLine").textContent=(st.name?st.name+" · ":"")+[st.vibe.time,st.vibe.mode,st.vibe.level].filter(Boolean).join(" · ");
   $("#hTags").innerHTML=st.sports.map(s=>`<span class="tag">${s}</span>`).join("")
-    +`<span class="tag">${st.days.length} days/week</span>`
+    +`<span class="tag">${st.days.length} ${st.days.length===1?"day":"days"}/week</span>`
     +(st.zip?`<span class="tag">📍 ${st.zip}</span>`:(JSON.parse(localStorage.getItem("fitkin")||"{}").cell?`<span class="tag">📍 my area</span>`:""));
   go(4);
 }
