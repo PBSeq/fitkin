@@ -210,6 +210,8 @@ H.style.setProperty("--sys",Math.max(1,Math.min(s,1.6)))})();</script>
   .kava{width:40px;height:40px;flex:none;border-radius:var(--r-ctl);background:var(--card2);border:1px solid var(--line);
         display:flex;align-items:center;justify-content:center;font-size:var(--fs-xl)}
   .kinrow p{font-size:var(--fs-sm);color:var(--dim)}
+  .kinrow > div{min-width:0}
+  .kinrow b,.kinrow p{overflow-wrap:anywhere}
   .dimtext{color:var(--dim);font-size:var(--fs-md)}
   #toast{position:fixed;left:50%;bottom:36px;transform:translate(-50%,26px) scale(.9);background:var(--volt);
          color:#0c120e;font-weight:700;font-size:var(--fs-base);padding:12px 22px;border-radius:var(--r-pill);
@@ -254,7 +256,8 @@ H.style.setProperty("--sys",Math.max(1,Math.min(s,1.6)))})();</script>
   #review.on{display:flex;animation:up .35s var(--spring)}
   #profile{position:fixed;inset:0;background:var(--bg);z-index:57;display:none;flex-direction:column;
           padding:max(18px,env(safe-area-inset-top)) 18px calc(14px + env(safe-area-inset-bottom));
-          max-width:430px;margin:0 auto;overflow-y:auto}
+          max-width:min(430px,100vw);margin:0 auto;overflow-y:auto;overflow-x:hidden}
+  #pfBody{min-width:0;overflow-wrap:anywhere}
   #profile.on{display:flex;animation:up .35s var(--spring)}
   .pf-facts{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;margin:14px 0 0;font-size:var(--fs-md)}
   .pf-facts dt{color:var(--dim)}
@@ -277,7 +280,8 @@ H.style.setProperty("--sys",Math.max(1,Math.min(s,1.6)))})();</script>
   #chat.on{display:flex;animation:up .35s var(--spring)}
   .chat-head{display:flex;align-items:center;justify-content:space-between;
              border-bottom:1px solid var(--line);padding-bottom:10px}
-  .chat-head b{font-size:var(--fs-xl)}
+  .chat-head b{font-size:var(--fs-xl);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .chat-head > span{flex:none}
   #chatMsgs{flex:1;overflow-y:auto;padding:14px 2px;display:flex;flex-direction:column;gap:8px}
   .msg{background:var(--card);border:1px solid var(--line);border-radius:var(--r-ctl) var(--r-ctl) var(--r-ctl) 4px;
        padding:10px 15px;font-size:var(--fs-base);max-width:80%;align-self:flex-start;word-break:break-word}
@@ -425,7 +429,7 @@ H.style.setProperty("--sys",Math.max(1,Math.min(s,1.6)))})();</script>
         <button class="chat-act" onclick="fitkinAreaHome()" aria-label="back to my home area">🏠</button></span>
       </div>
       <p class="dimtext" style="font-size:var(--fs-xs);margin-bottom:8px">your kin card (name · sports · area) is visible to other fitkin users — that's how kin find each other.</p>
-      <div class="fchips" id="radiusChips" role="group" aria-label="how far to look" style="padding-top:0"></div>
+      <div class="fchips" id="radiusChips" role="group" aria-label="how far to look" style="padding-top:0;flex-wrap:wrap;overflow:visible"></div>
       <p class="dimtext" style="font-size:var(--fs-xs);margin:0 0 6px">distances are approximate. we only keep a rough ~5 km area, never your exact spot.</p>
       <p id="areaRow" style="font-size:var(--fs-sm);font-weight:700;color:var(--volt);margin:2px 0 4px"></p>
       <p class="dimtext" id="seekRow" style="font-size:var(--fs-xs);margin-top:6px"></p>
@@ -584,7 +588,7 @@ function reset(){localStorage.removeItem("fitkin");location.reload()}
     <button class="fchip" id="fShare" onclick="fitkinMoment()" style="margin-left:auto;display:none">+ share</button>
   </div>
   <p class="dimtext" style="font-size:var(--fs-xs);margin-top:6px" id="feedSub">everyone near your zip — tap a sport to filter.</p>
-  <div class="fchips" id="feedRadius" role="group" aria-label="how far to look"></div>
+  <div class="fchips" id="feedRadius" role="group" aria-label="how far to look" style="flex-wrap:wrap;overflow:visible"></div>
   <div class="fchips" id="feedChips"></div>
   <div class="fchips" id="feedChips2" style="padding-top:0"></div>
   <div class="fchips" id="feedChips3" style="padding-top:0"></div>
