@@ -398,7 +398,7 @@ H.style.setProperty("--sys",Math.max(1,Math.min(s,1.6)))})();</script>
     <div class="cta">
       <label class="tosrow" for="tosOk">
         <input type="checkbox" id="tosOk">
-        <span>I'm 17 or older and I agree to the
+        <span>I'm 18 or older and I agree to the
         <a href="https://pbseq.github.io/fitkin/terms.html" target="_blank" rel="noopener">terms of use</a>
         (including the safety, release and liability sections) and the
         <a href="https://pbseq.github.io/fitkin/privacy.html" target="_blank" rel="noopener">privacy policy</a>.
@@ -415,7 +415,7 @@ H.style.setProperty("--sys",Math.max(1,Math.min(s,1.6)))})();</script>
       <p class="dimtext" style="font-size:var(--fs-sm);margin:6px 0 10px">the new terms make clear that meeting other users is at your own risk
         and add a release and liability section. please read them and agree to keep using fitkin.</p>
       <label class="tosrow" for="tosOk2"><input type="checkbox" id="tosOk2">
-        <span>I'm 17 or older and I agree to the
+        <span>I'm 18 or older and I agree to the
         <a href="https://pbseq.github.io/fitkin/terms.html" target="_blank" rel="noopener">updated terms of use</a> and the
         <a href="https://pbseq.github.io/fitkin/privacy.html" target="_blank" rel="noopener">privacy policy</a>.</span></label>
       <button class="btn" id="tosAgree" disabled>agree</button>
@@ -536,7 +536,7 @@ function hasArea(){if(/^[0-9]{5}$/.test($("#fZip").value.trim()))return true;
   const f=JSON.parse(localStorage.getItem("fitkin")||"{}");
   return typeof f.cell==="string"&&/^[0-9b-hjkmnp-z]{5}$/.test(f.cell)}
 // 약관 동의 = 체크박스(명시적 동의). 버전을 기기와 카드에 남겨 어떤 약관에 동의했는지 증명한다 (박사님 10-09)
-const TOS_VERSION="2026-10-09";
+const TOS_VERSION="2026-10-09.2";   // .2 = 18세 이상으로 상향(박사님 10-09)
 function checkS3(){$("#b3").disabled=!(st.days.length&&$("#fName").value.trim()&&hasArea()&&$("#tosOk").checked)}
 $("#fName").value=st.name||((st.loginName||"").split(" ")[0])||""; $("#fZip").value=st.zip||"";
 $("#fName").oninput=$("#fZip").oninput=checkS3; $("#tosOk").onchange=checkS3;
