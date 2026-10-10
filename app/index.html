@@ -55,6 +55,9 @@ H.style.setProperty("--sys",Math.max(1,Math.min(s,1.6)))})();</script>
     background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence baseFrequency='.85' numOctaves='2'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .04 0'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E")}
   #phone{width:100%;max-width:430px;min-height:100dvh;display:flex;flex-direction:column;
          padding:max(18px,env(safe-area-inset-top)) 20px calc(18px + env(safe-area-inset-bottom))}
+  .tosrow{display:flex;gap:10px;align-items:flex-start;font-size:var(--fs-sm);color:var(--dim);line-height:1.5;margin:4px 0 12px;cursor:pointer}
+  .tosrow input{flex:none;width:24px;height:24px;margin:2px 0 0;accent-color:var(--volt)}
+  .tosrow a{color:var(--mint);text-decoration:underline}
   .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
   :focus-visible{outline:2px solid var(--volt);outline-offset:2px}
   .screen{display:none;flex-direction:column;flex:1;animation:in .35s ease}
@@ -393,18 +396,30 @@ H.style.setProperty("--sys",Math.max(1,Math.min(s,1.6)))})();</script>
         your phone asks for location once, turns it into a rough ~5km area code on-device,
         and only that area code is stored. your exact coordinates never leave your phone.</p></div>
     <div class="cta">
+      <label class="tosrow" for="tosOk">
+        <input type="checkbox" id="tosOk">
+        <span>I'm 17 or older and I agree to the
+        <a href="https://pbseq.github.io/fitkin/terms.html" target="_blank" rel="noopener">terms of use</a>
+        (including the safety, release and liability sections) and the
+        <a href="https://pbseq.github.io/fitkin/privacy.html" target="_blank" rel="noopener">privacy policy</a>.
+        I understand that meeting other users is at my own risk.</span></label>
       <button class="btn" id="b3" disabled onclick="finish()">build my kin card</button>
-      <p style="text-align:center;font-size:var(--fs-xs);color:var(--dim);margin-top:8px;line-height:1.5">
-        by building your card you agree to the
-        <a href="https://pbseq.github.io/fitkin/terms.html" style="color:var(--mint)">terms</a> &amp;
-        <a href="https://pbseq.github.io/fitkin/privacy.html" style="color:var(--mint)">privacy policy</a> —
-        fitkin introduces people; meetups are at your own risk.</p>
     </div>
   </section>
 
   <!-- 4 · Home -->
   <section class="screen" id="s4">
     <div class="logo"><img src="../mark.png" alt="" style="height:26px;vertical-align:-5px;margin-right:6px">fit<b>kin</b></div>
+    <div class="card" id="tosCard" style="display:none;border-color:var(--volt)">
+      <h3 style="font-size:var(--fs-lg)">we updated our terms</h3>
+      <p class="dimtext" style="font-size:var(--fs-sm);margin:6px 0 10px">the new terms make clear that meeting other users is at your own risk
+        and add a release and liability section. please read them and agree to keep using fitkin.</p>
+      <label class="tosrow" for="tosOk2"><input type="checkbox" id="tosOk2">
+        <span>I'm 17 or older and I agree to the
+        <a href="https://pbseq.github.io/fitkin/terms.html" target="_blank" rel="noopener">updated terms of use</a> and the
+        <a href="https://pbseq.github.io/fitkin/privacy.html" target="_blank" rel="noopener">privacy policy</a>.</span></label>
+      <button class="btn" id="tosAgree" disabled>agree</button>
+    </div>
     <div class="card"><div class="me">
       <div class="ava" id="hAva" onclick="fitkinSetPhoto()" style="cursor:pointer" title="add a profile photo" role="button" aria-label="add a profile photo">🏃</div>
       <div><h3>your kin card</h3><p id="hLine"></p></div>
@@ -484,7 +499,7 @@ function go(n){document.querySelectorAll(".screen").forEach(s=>s.classList.remov
   $("#s"+n).classList.add("on");window.scrollTo(0,0);save()}
 function save(){const f=JSON.parse(localStorage.getItem("fitkin")||"{}");
   if(f.photoData&&!st.photoData)st.photoData=f.photoData;   // 번들이 저장한 프로필 사진 보존
-  ["cell","derivedCell","id","published","homeZip","homeCell","areaName","areaKey","hidden","loginName"].forEach(k=>{if(k in f)st[k]=f[k]});  // 번들 소유 필드 승계
+  ["cell","derivedCell","id","published","homeZip","homeCell","areaName","areaKey","hidden","loginName","kincode","kincodeExp","kinCount","radius","reported","pushOn"].forEach(k=>{if(k in f)st[k]=f[k]});  // 번들 소유 필드 승계
   localStorage.setItem("fitkin",JSON.stringify(st))}
 
 SPORTS.forEach(([e,n])=>{const c=document.createElement("div");c.className="chip";
@@ -520,9 +535,11 @@ DAYS.forEach((d,i)=>{const b=document.createElement("button");b.className="day";
 function hasArea(){if(/^[0-9]{5}$/.test($("#fZip").value.trim()))return true;
   const f=JSON.parse(localStorage.getItem("fitkin")||"{}");
   return typeof f.cell==="string"&&/^[0-9b-hjkmnp-z]{5}$/.test(f.cell)}
-function checkS3(){$("#b3").disabled=!(st.days.length&&$("#fName").value.trim()&&hasArea())}
+// 약관 동의 = 체크박스(명시적 동의). 버전을 기기와 카드에 남겨 어떤 약관에 동의했는지 증명한다 (박사님 10-09)
+const TOS_VERSION="2026-10-09";
+function checkS3(){$("#b3").disabled=!(st.days.length&&$("#fName").value.trim()&&hasArea()&&$("#tosOk").checked)}
 $("#fName").value=st.name||((st.loginName||"").split(" ")[0])||""; $("#fZip").value=st.zip||"";
-$("#fName").oninput=$("#fZip").oninput=checkS3;
+$("#fName").oninput=$("#fZip").oninput=checkS3; $("#tosOk").onchange=checkS3;
 checkS3();
 
 // 렌더(로컬)와 발행(네트워크)을 분리 — 매 로드마다 재발행하지 않는다
@@ -543,10 +560,18 @@ function renderCard(){
     +`<span class="tag">${st.days.length} ${st.days.length===1?"day":"days"}/week</span>`
     +(st.zip?`<span class="tag">📍 ${st.zip}</span>`:(JSON.parse(localStorage.getItem("fitkin")||"{}").cell?`<span class="tag">📍 my area</span>`:""));
   go(4);
+  { const need=(JSON.parse(localStorage.getItem("fitkin")||"{}").tos||st.tos)!==TOS_VERSION;
+    const c=$("#tosCard"); if(c) c.style.display=need?"":"none";
+    const cb=$("#tosOk2"), bt=$("#tosAgree");
+    if(cb&&bt){ cb.onchange=()=>{bt.disabled=!cb.checked};
+      bt.onclick=()=>{ st.tos=TOS_VERSION; st.tosAt=Date.now(); save(); c.style.display="none";
+        const f=JSON.parse(localStorage.getItem("fitkin")||"{}"); f.published=0; localStorage.setItem("fitkin",JSON.stringify(f));
+        if(window.fitkinPublish) window.fitkinPublish(); }; } }
 }
 function finish(){
   st.name=$("#fName").value.trim();
   const z=$("#fZip").value.trim(); st.zip=/^[0-9]{5}$/.test(z)?z:"";
+  st.tos=TOS_VERSION; st.tosAt=Date.now();
   st.done=Date.now();save();renderCard();
   if(window.fitkinPublish)window.fitkinPublish();   // 최초 발행 (이후 로드는 렌더만)
 }
