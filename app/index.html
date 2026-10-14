@@ -413,7 +413,7 @@ H.style.setProperty("--sys",Math.max(1,Math.min(s,1.6)))})();</script>
     <div class="card" id="tosCard" style="display:none;border-color:var(--volt)">
       <h3 style="font-size:var(--fs-lg)">we updated our terms</h3>
       <p class="dimtext" style="font-size:var(--fs-sm);margin:6px 0 10px">the new terms make clear that meeting other users is at your own risk
-        and add a release and liability section. please read them and agree to keep using fitkin.</p>
+        and add a release and liability section. please read them and tap agree.</p>
       <label class="tosrow" for="tosOk2"><input type="checkbox" id="tosOk2">
         <span>I'm 18 or older and I agree to the
         <a href="https://pbseq.github.io/fitkin/terms.html" target="_blank" rel="noopener">updated terms of use</a> and the
@@ -497,10 +497,17 @@ st.sports=st.sports||[]; st.days=st.days||[]; st.vibe=st.vibe||{};
 const $=q=>document.querySelector(q);
 function go(n){document.querySelectorAll(".screen").forEach(s=>s.classList.remove("on"));
   $("#s"+n).classList.add("on");window.scrollTo(0,0);save()}
+// 이 스크립트가 고치는 키는 OWN 뿐이다. 나머지(사진·셀·킨 코드·초대 대기 등)는 번들 소유라 저장소 값을 그대로 둔다.
+// 옛 방식(st 통째 쓰기 + 승계 목록)은 목록에 없는 키를 낡은 값으로 덮었다 — 초대 링크 소실·사진 교체 무효·출장 지역 되돌림 (TE 10-11).
+// OWN 키도 내가 마지막 저장 뒤로 바꾼 것만 쓰고, 안 바꾼 것은 저장소(번들이 고쳤을 수 있다)를 따른다.
+const OWN=["sports","vibe","days","name","zip","tos","tosAt","done"];
+const base={}; function snap(){OWN.forEach(k=>base[k]=JSON.stringify(st[k]))}
+snap();
 function save(){const f=JSON.parse(localStorage.getItem("fitkin")||"{}");
-  if(f.photoData&&!st.photoData)st.photoData=f.photoData;   // 번들이 저장한 프로필 사진 보존
-  ["cell","derivedCell","id","published","homeZip","homeCell","areaName","areaKey","hidden","loginName","kincode","kincodeExp","kinCount","radius","reported","pushOn"].forEach(k=>{if(k in f)st[k]=f[k]});  // 번들 소유 필드 승계
-  localStorage.setItem("fitkin",JSON.stringify(st))}
+  OWN.forEach(k=>{if(JSON.stringify(st[k])!==base[k]){if(st[k]===undefined)delete f[k];else f[k]=st[k]}});
+  Object.keys(st).forEach(k=>delete st[k]);Object.assign(st,JSON.parse(JSON.stringify(f)));
+  st.sports=st.sports||[]; st.days=st.days||[]; st.vibe=st.vibe||{};
+  localStorage.setItem("fitkin",JSON.stringify(f));snap()}
 
 SPORTS.forEach(([e,n])=>{const c=document.createElement("div");c.className="chip";
   c.textContent=e+" "+n; if(st.sports.includes(n))c.classList.add("sel");
@@ -544,6 +551,7 @@ checkS3();
 
 // 렌더(로컬)와 발행(네트워크)을 분리 — 매 로드마다 재발행하지 않는다
 function renderCard(){
+  save();   // 번들이 고친 값(이름·지역 등)을 먼저 받아 온 뒤 그린다
   const em=(SPORTS.find(([e,n])=>n===st.sports[0])||["🏃"])[0];
   const fresh=JSON.parse(localStorage.getItem("fitkin")||"{}");
   if(typeof fresh.photoData==="string"&&/^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(fresh.photoData)){
