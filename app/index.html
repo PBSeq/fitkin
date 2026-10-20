@@ -276,6 +276,13 @@ H.style.setProperty("--sys",Math.max(1,Math.min(s,1.6)))})();</script>
           padding:max(18px,env(safe-area-inset-top)) 18px calc(14px + env(safe-area-inset-bottom));
           max-width:min(430px,100vw);margin:0 auto;overflow-y:auto;overflow-x:hidden}
   #logSheet.on{display:flex;animation:up .35s var(--spring)}
+  #areaSheet{position:fixed;inset:0;background:var(--bg);z-index:59;display:none;flex-direction:column;
+          padding:max(18px,env(safe-area-inset-top)) 18px calc(14px + env(safe-area-inset-bottom));
+          max-width:min(430px,100vw);margin:0 auto;overflow-y:auto;overflow-x:hidden}
+  #areaSheet.on{display:flex;animation:up .35s var(--spring)}
+  #areaSheet .chat-head b{white-space:normal;overflow-wrap:anywhere;min-width:0}
+  #hTags .tag{max-width:100%;overflow-wrap:anywhere}
+  #toast{max-width:calc(100vw - 32px);overflow-wrap:anywhere;text-align:center}
   .kinrow[role=button]{cursor:pointer}
   .rvstar{background:none;border:0;font-size:2.375rem;color:var(--dim);cursor:pointer;padding:2px 6px;
           font-family:inherit;transition:transform .3s var(--spring),color .15s}
@@ -387,14 +394,15 @@ H.style.setProperty("--sys",Math.max(1,Math.min(s,1.6)))})();</script>
     <div class="grid7" id="days"></div>
     <div class="opt-group" style="margin-top:22px"><label class="opt-label" for="fName">display name</label>
       <input class="field" id="fName" maxlength="30" placeholder="what do we call you?"></div>
-    <div class="opt-group"><label class="opt-label" for="fZip">where you work out</label>
-      <input class="field" id="fZip" maxlength="5" inputmode="numeric" pattern="[0-9]*"
-             placeholder="US zip — how we find kin near you">
-      <button class="btn ghost" style="margin-top:8px" type="button"
-              onclick="if(window.fitkinUseLocation)fitkinUseLocation()">&#128205; use my location instead</button>
+    <div class="opt-group"><span class="opt-label" id="areaLbl">where you work out</span>
+      <p id="areaPicked" aria-live="polite" style="font-size:var(--fs-sm);margin:2px 0 6px;overflow-wrap:anywhere"></p>
+      <button class="btn ghost" type="button" aria-describedby="areaLbl"
+              onclick="if(window.fitkinUseLocation)fitkinUseLocation()">&#128205; use my location</button>
+      <button class="btn ghost" style="margin-top:8px" type="button" aria-describedby="areaLbl"
+              onclick="if(window.fitkinAreaPicker)fitkinAreaPicker('home',true)">&#128269; search my neighborhood or city</button>
       <p style="font-size:var(--fs-xs);color:var(--dim);margin-top:6px;line-height:1.45">anywhere in the world —
-        your phone asks for location once, turns it into a rough ~5km area code on-device,
-        and only that area code is stored. your exact coordinates never leave your phone.</p></div>
+        we turn your spot into a rough ~5km area and keep only that, so kin can see about how far away you are.
+        your exact location is never stored.</p></div>
     <div class="cta">
       <label class="tosrow" for="tosOk">
         <input type="checkbox" id="tosOk">
@@ -464,7 +472,7 @@ H.style.setProperty("--sys",Math.max(1,Math.min(s,1.6)))})();</script>
       <p class="dimtext" style="font-size:var(--fs-xs);margin:0 0 6px">distances are approximate. we only keep a rough ~5 km area, never your exact spot.</p>
       <p id="areaRow" style="font-size:var(--fs-sm);font-weight:700;color:var(--volt);margin:2px 0 4px"></p>
       <p class="dimtext" id="seekRow" style="font-size:var(--fs-xs);margin-top:6px"></p>
-      <div id="nearList"><p class="dimtext">finding people in your zip…</p></div>
+      <div id="nearList"><p class="dimtext">finding people near you…</p></div>
       <button class="scanbtn" onclick="fitkinFeed()" style="width:100%">👀 open kin feed — browse kin near you</button></div>
 
     <div class="card"><h3 style="font-size:var(--fs-lg);margin-bottom:8px">your kin</h3>
@@ -495,6 +503,7 @@ const st=JSON.parse(localStorage.getItem("fitkin")||"{}");
 st.sports=st.sports||[]; st.days=st.days||[]; st.vibe=st.vibe||{};
 
 const $=q=>document.querySelector(q);
+const esc0=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 function go(n){document.querySelectorAll(".screen").forEach(s=>s.classList.remove("on"));
   $("#s"+n).classList.add("on");window.scrollTo(0,0);save()}
 // 이 스크립트가 고치는 키는 OWN 뿐이다. 나머지(사진·셀·킨 코드·초대 대기 등)는 번들 소유라 저장소 값을 그대로 둔다.
@@ -539,15 +548,18 @@ DAYS.forEach((d,i)=>{const b=document.createElement("button");b.className="day";
     st.days=st.days.includes(i)?st.days.filter(x=>x!==i):[...st.days,i];
     checkS3();save()};
   $("#days").appendChild(b)});
-function hasArea(){if(/^[0-9]{5}$/.test($("#fZip").value.trim()))return true;
-  const f=JSON.parse(localStorage.getItem("fitkin")||"{}");
-  return typeof f.cell==="string"&&/^[0-9b-hjkmnp-z]{5}$/.test(f.cell)}
+function hasArea(){const f=JSON.parse(localStorage.getItem("fitkin")||"{}");
+  return /^[0-9]{5}$/.test(f.zip||"")||(typeof f.cell==="string"&&/^[0-9b-hjkmnp-z]{5}$/.test(f.cell))}
+function paintPicked(){const el=$("#areaPicked");if(!el)return;const f=JSON.parse(localStorage.getItem("fitkin")||"{}");
+  el.textContent=hasArea()?"📍 "+(f.areaName||"area set ✓ (~5km)"):"";}
+window.fitkinAreaChanged=()=>{paintPicked();checkS3();
+  if(st.done&&$("#s4").classList.contains("on")){const y=window.scrollY;renderCard();window.scrollTo(0,y)}};   // 홈 카드의 📍 태그도 새 동네로
 // 약관 동의 = 체크박스(명시적 동의). 버전을 기기와 카드에 남겨 어떤 약관에 동의했는지 증명한다 (박사님 10-09)
 const TOS_VERSION="2026-10-09.2";   // .2 = 18세 이상으로 상향(박사님 10-09)
 function checkS3(){$("#b3").disabled=!(st.days.length&&$("#fName").value.trim()&&hasArea()&&$("#tosOk").checked)}
-$("#fName").value=st.name||((st.loginName||"").split(" ")[0])||""; $("#fZip").value=st.zip||"";
-$("#fName").oninput=$("#fZip").oninput=checkS3; $("#tosOk").onchange=checkS3;
-checkS3();
+$("#fName").value=st.name||((st.loginName||"").split(" ")[0])||"";
+$("#fName").oninput=checkS3; $("#tosOk").onchange=checkS3;
+paintPicked(); checkS3();
 
 // 렌더(로컬)와 발행(네트워크)을 분리 — 매 로드마다 재발행하지 않는다
 function renderCard(){
@@ -566,7 +578,7 @@ function renderCard(){
   $("#hLine").textContent=(st.name?st.name+" · ":"")+[st.vibe.time,st.vibe.mode,st.vibe.level].filter(Boolean).join(" · ");
   $("#hTags").innerHTML=st.sports.map(s=>`<span class="tag">${s}</span>`).join("")
     +`<span class="tag">${st.days.length} ${st.days.length===1?"day":"days"}/week</span>`
-    +(st.zip?`<span class="tag">📍 ${st.zip}</span>`:(JSON.parse(localStorage.getItem("fitkin")||"{}").cell?`<span class="tag">📍 my area</span>`:""));
+    +(hasArea()?`<span class="tag">📍 ${esc0(JSON.parse(localStorage.getItem("fitkin")||"{}").areaName||"my area")}</span>`:"");
   go(4);
   { const need=(JSON.parse(localStorage.getItem("fitkin")||"{}").tos||st.tos)!==TOS_VERSION;
     const c=$("#tosCard"); if(c) c.style.display=need?"":"none";
@@ -578,7 +590,6 @@ function renderCard(){
 }
 function finish(){
   st.name=$("#fName").value.trim();
-  const z=$("#fZip").value.trim(); st.zip=/^[0-9]{5}$/.test(z)?z:"";
   st.tos=TOS_VERSION; st.tosAt=Date.now();
   st.done=Date.now();save();renderCard();
   if(window.fitkinPublish)window.fitkinPublish();   // 최초 발행 (이후 로드는 렌더만)
@@ -617,6 +628,24 @@ function reset(){localStorage.removeItem("fitkin");location.reload()}
   <input class="field" id="rvComment" maxlength="140" placeholder="great tempo, showed up early…">
   <div class="cta"><button class="btn" id="rvSubmit" disabled onclick="fitkinReviewSubmit()">post review</button></div>
 </div>
+<div id="areaSheet" role="dialog" aria-modal="true" aria-labelledby="areaTitle">
+  <div class="chat-head">
+    <b id="areaTitle">where do you work out?</b>
+    <button class="chat-act" onclick="fitkinAreaClose()" aria-label="close">✕</button>
+  </div>
+  <button class="btn" type="button" style="margin-top:14px" onclick="fitkinAreaUseLoc()">&#128205; use my location</button>
+  <p class="dimtext" style="text-align:center;margin:14px 0 8px;font-size:var(--fs-sm)">or search</p>
+  <form style="display:flex;gap:8px" onsubmit="event.preventDefault();fitkinAreaSearch()">
+    <input class="field" id="areaQ" maxlength="80" autocomplete="off" enterkeyhint="search"
+           aria-label="neighborhood or city" placeholder="neighborhood or city" style="flex:1;min-width:0">
+    <button class="btn" type="submit" style="width:auto;flex:none;padding:0 16px" aria-label="search">&#128269;</button>
+  </form>
+  <div id="areaResults" style="margin-top:10px"></div>
+  <p style="font-size:var(--fs-xs);color:var(--dim);margin-top:auto;padding-top:16px;line-height:1.45">
+    no street address needed — a neighborhood or city is enough. we keep only a rough ~5km area. place search by
+    <a href="https://photon.komoot.io" target="_blank" rel="noopener" style="color:var(--mint)">Photon</a> ·
+    map data © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener" style="color:var(--mint)">OpenStreetMap</a> contributors.</p>
+</div>
 <div id="logSheet" role="dialog" aria-modal="true" aria-labelledby="logTitle">
   <div class="chat-head">
     <b id="logTitle">log a workout</b>
@@ -643,7 +672,7 @@ function reset(){localStorage.removeItem("fitkin");location.reload()}
     <button class="fchip" id="ftabMoments" onclick="fitkinFeedTab('moments')">📸 moments</button>
     <button class="fchip" id="fShare" onclick="fitkinMoment()" style="margin-left:auto;display:none">+ share</button>
   </div>
-  <p class="dimtext" style="font-size:var(--fs-xs);margin-top:6px" id="feedSub">everyone near your zip — tap a sport to filter.</p>
+  <p class="dimtext" style="font-size:var(--fs-xs);margin-top:6px" id="feedSub">kin around your area — tap a sport to filter.</p>
   <div class="fchips" id="feedRadius" role="group" aria-label="how far to look" style="flex-wrap:wrap;overflow:visible"></div>
   <div class="fchips" id="feedChips"></div>
   <div class="fchips" id="feedChips2" style="padding-top:0"></div>
