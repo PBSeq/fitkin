@@ -370,8 +370,9 @@ H.style.setProperty("--sys",Math.max(1,Math.min(s,1.6)))})();</script>
   <!-- 2 · Vibe -->
   <section class="screen" id="s2">
     <div class="logo"><img src="../mark.png" alt="" style="height:26px;vertical-align:-5px;margin-right:6px">fit<b>kin</b></div>
-    <span class="step-tag">2/3 · your vibe</span>
+    <span class="step-tag">2/3 · your vibe · optional</span>
     <h1>how do you move?</h1>
+    <p class="sub">all optional — it helps us match you. skip it if you like.</p>
     <div class="opt-group"><div class="opt-label">when</div>
       <div class="seg" data-k="time" title="pick all that apply"><button>🌅 mornings</button><button>☀️ daytime</button><button>🌙 nights</button></div></div>
     <div class="opt-group"><div class="opt-label">energy</div>
@@ -382,7 +383,7 @@ H.style.setProperty("--sys",Math.max(1,Math.min(s,1.6)))})();</script>
       <div class="seg" data-k="age" style="flex-wrap:wrap"><button>18–24</button><button>25–34</button><button>35–44</button><button>45–54</button><button>55+</button></div></div>
     <div class="opt-group"><div class="opt-label">i am <span style="font-weight:400;text-transform:none">· optional</span></div>
       <div class="seg" data-k="gender" style="flex-wrap:wrap"><button>woman</button><button>man</button><button>non-binary</button><button>rather not say</button></div></div>
-    <div class="cta"><button class="btn" id="b2" disabled onclick="go(3)">next</button></div>
+    <div class="cta"><button class="btn" id="b2" onclick="go(3)">skip for now</button></div>
   </section>
 
   <!-- 3 · Schedule -->
@@ -390,7 +391,7 @@ H.style.setProperty("--sys",Math.max(1,Math.min(s,1.6)))})();</script>
     <div class="logo"><img src="../mark.png" alt="" style="height:26px;vertical-align:-5px;margin-right:6px">fit<b>kin</b></div>
     <span class="step-tag">3/3 · your week</span>
     <h1>when do you show up?</h1>
-    <p class="sub">tap the days you can usually move.</p>
+    <p class="sub">tap the days you can usually move (optional).</p>
     <div class="grid7" id="days"></div>
     <div class="opt-group" style="margin-top:22px"><label class="opt-label" for="fName">display name</label>
       <input class="field" id="fName" maxlength="30" placeholder="what do we call you?"></div>
@@ -434,6 +435,14 @@ H.style.setProperty("--sys",Math.max(1,Math.min(s,1.6)))})();</script>
     </div><div class="tags" id="hTags"></div>
     <p id="photoNudge" class="dimtext" style="font-size:var(--fs-sm);margin-top:10px;display:none">
       📷 tap your avatar to add a photo, so kin know who they're meeting.</p></div>
+
+    <div class="card" id="pushAsk" style="display:none;border-color:var(--mint)">
+      <h3 style="font-size:var(--fs-lg)">🔔 want a heads-up?</h3>
+      <p class="dimtext" style="font-size:var(--fs-sm);margin:6px 0 10px">we'll tell you when someone near you joins, or when a kin waves or messages you.
+        nothing else — no marketing.</p>
+      <button class="btn" onclick="if(window.fitkinPushYes)fitkinPushYes()">notify me</button>
+      <button class="btn ghost" style="margin-top:8px" onclick="if(window.fitkinPushLater)fitkinPushLater()">not now</button>
+    </div>
 
     <div class="card">
       <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px">
@@ -539,8 +548,10 @@ document.querySelectorAll(".seg[data-k]").forEach(seg=>{const k=seg.dataset.k;
         [...seg.children].forEach(x=>x.classList.remove("sel"));
         b.classList.add("sel");st.vibe[k]=b.textContent;
       }
-      $("#b2").disabled=!(st.vibe.time&&st.vibe.mode&&st.vibe.level);save()}})});
-$("#b2").disabled=!(st.vibe.time&&st.vibe.mode&&st.vibe.level);
+      b2Label();save()}})});
+// 1.13 — 2단계는 전부 선택(카드 완성 26/273, 관제탑 11-15). 아무것도 안 골랐으면 "skip for now", 골랐으면 "next"
+function b2Label(){const any=["time","mode","level","age","gender"].some(k=>st.vibe[k]);$("#b2").textContent=any?"next":"skip for now"}
+b2Label();
 
 DAYS.forEach((d,i)=>{const b=document.createElement("button");b.className="day";b.textContent=d;
   if(st.days.includes(i))b.classList.add("sel");
@@ -556,7 +567,8 @@ window.fitkinAreaChanged=()=>{paintPicked();checkS3();
   if(st.done&&$("#s4").classList.contains("on")){const y=window.scrollY;renderCard();window.scrollTo(0,y)}};   // 홈 카드의 📍 태그도 새 동네로
 // 약관 동의 = 체크박스(명시적 동의). 버전을 기기와 카드에 남겨 어떤 약관에 동의했는지 증명한다 (박사님 10-09)
 const TOS_VERSION="2026-10-09.2";   // .2 = 18세 이상으로 상향(박사님 10-09)
-function checkS3(){$("#b3").disabled=!(st.days.length&&$("#fName").value.trim()&&hasArea()&&$("#tosOk").checked)}
+// 1.13 — 요일은 선택. 꼭 필요한 것: 이름 · 지역(근처 킨을 찾으려면) · 약관 동의
+function checkS3(){$("#b3").disabled=!($("#fName").value.trim()&&hasArea()&&$("#tosOk").checked)}
 $("#fName").value=st.name||((st.loginName||"").split(" ")[0])||"";
 $("#fName").oninput=checkS3; $("#tosOk").onchange=checkS3;
 paintPicked(); checkS3();
@@ -575,9 +587,9 @@ function renderCard(){
   else $("#hAva").textContent=em;
   { const hasPhoto=typeof fresh.photoData==="string"&&fresh.photoData.startsWith("data:image/jpeg;base64,");
     const n=$("#photoNudge"); if(n) n.style.display=hasPhoto?"none":""; }
-  $("#hLine").textContent=(st.name?st.name+" · ":"")+[st.vibe.time,st.vibe.mode,st.vibe.level].filter(Boolean).join(" · ");
+  $("#hLine").textContent=[st.name,st.vibe.time,st.vibe.mode,st.vibe.level].filter(Boolean).join(" · ");   // 최소 카드에 끝 구분점이 매달리지 않게(TE 1.13 2차 P3-2)
   $("#hTags").innerHTML=st.sports.map(s=>`<span class="tag">${s}</span>`).join("")
-    +`<span class="tag">${st.days.length} ${st.days.length===1?"day":"days"}/week</span>`
+    +(st.days.length?`<span class="tag">${st.days.length} ${st.days.length===1?"day":"days"}/week</span>`:"")
     +(hasArea()?`<span class="tag">📍 ${esc0(JSON.parse(localStorage.getItem("fitkin")||"{}").areaName||"my area")}</span>`:"");
   go(4);
   { const need=(JSON.parse(localStorage.getItem("fitkin")||"{}").tos||st.tos)!==TOS_VERSION;
