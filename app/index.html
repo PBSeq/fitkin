@@ -62,7 +62,9 @@ H.style.setProperty("--sys",Math.max(1,Math.min(s,1.6)))})();</script>
   :focus-visible{outline:2px solid var(--volt);outline-offset:2px}
   .screen{display:none;flex-direction:column;flex:1;animation:in .35s ease}
   .screen.on{display:flex}
-  @keyframes in{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+  /* 들어오는 움직임은 위치만 — 투명(opacity 0)에서 시작하지 않는다. 아이폰 앱에서 애니메이션이 안 돌면 카드가 투명한 채 남아
+     홈 화면 일부가 배경색으로 비어 보였다(박사님 11-15 화면 사진: 빈 곳 = 배경 #0c120e, 지연 애니메이션이 걸린 4·5번째 카드) */
+  @keyframes in{from{transform:translateY(14px)}to{transform:none}}
 
   .logo{font-weight:700;font-size:var(--fs-2xl);letter-spacing:-.4px}
   .stik{display:inline-flex;align-items:center;justify-content:center;width:78px;height:78px;
@@ -127,7 +129,7 @@ H.style.setProperty("--sys",Math.max(1,Math.min(s,1.6)))})();</script>
        font-family:inherit;font-size:var(--fs-lg);font-weight:700;padding:17px;border-radius:var(--r-pill);cursor:pointer;
        box-shadow:var(--press),var(--glow);transition:transform .1s,box-shadow .1s;
        position:relative;overflow:hidden}
-  .btn:not(:disabled)::after{content:"";position:absolute;top:0;bottom:0;left:-60px;width:46px;will-change:transform;
+  .btn:not(:disabled):not(.ghost)::after{content:"";position:absolute;top:0;bottom:0;left:-60px;width:46px;will-change:transform;
        background:linear-gradient(105deg,transparent,rgba(255,255,255,.5),transparent);
        animation:shine 3.4s ease-in-out infinite}
   @keyframes shine{0%,72%{transform:translateX(0)}100%{transform:translateX(calc(100vw + 80px))}}
@@ -142,7 +144,7 @@ H.style.setProperty("--sys",Math.max(1,Math.min(s,1.6)))})();</script>
   .card:nth-of-type(3){animation-delay:.06s}
   .card:nth-of-type(4){animation-delay:.12s}
   .card:nth-of-type(5){animation-delay:.18s}
-  @keyframes cardin{from{opacity:0;transform:translateY(16px) scale(.985)}to{opacity:1;transform:none}}
+  @keyframes cardin{from{transform:translateY(16px) scale(.985)}to{transform:none}}
   .me{display:flex;gap:14px;align-items:center}
   .me > div{min-width:0}
   .me h3,.me p{overflow-wrap:anywhere}
@@ -246,7 +248,7 @@ H.style.setProperty("--sys",Math.max(1,Math.min(s,1.6)))})();</script>
         padding:max(18px,env(safe-area-inset-top)) 18px calc(14px + env(safe-area-inset-bottom));
         max-width:430px;margin:0 auto}
   #feed.on{display:flex;animation:up .35s var(--spring)}
-  @keyframes up{from{opacity:0;transform:translateY(26px)}to{opacity:1;transform:none}}
+  @keyframes up{from{transform:translateY(26px)}to{transform:none}}
   #feedList{flex:1;overflow-y:auto;margin-top:10px}
   .fchips{display:flex;gap:8px;overflow-x:auto;padding:10px 0 4px;flex:none;-webkit-overflow-scrolling:touch;scrollbar-width:none}
   .fchips::-webkit-scrollbar{display:none}
@@ -608,7 +610,11 @@ function finish(){
 }
 if(st.done)renderCard();
 window.renderCard=renderCard;   // 번들이 프로필 사진 갱신 후 재도색할 수 있게
-function reset(){localStorage.removeItem("fitkin");location.reload()}
+// "redo my card" = 카드를 다시 만드는 화면만 다시 연다. 예전엔 기기 상태를 통째로 지워서 숨김(hidden)·프로필 사진이
+// 풀리고(숨긴 사람이 말없이 목록에 다시 뜸) 이름·종목이 빈 칸이었다(TE 1.13 재검토 P2-a). 이제 '완료' 표시만 지우고
+// 나머지(이름·종목·vibe·요일·지역·숨김·사진·알림 미루기)는 그대로 둔다 — 화면은 이 값으로 채워져 열린다.
+// published 는 0 으로 — 다시 만든 카드가 올라가다 실패하면 다음에 열 때 다시 올린다(TE 재검토 델타 P2)
+function reset(){const f=JSON.parse(localStorage.getItem("fitkin")||"{}");delete f.done;f.published=0;localStorage.setItem("fitkin",JSON.stringify(f));location.reload()}
 // 글자 크기 4단계 (디자인 명령서 09-30 §1-1): 기기별 저장, "redo my card"로도 안 지워진다
 (function(){const seg=$("#textScale");if(!seg)return;const H=document.documentElement;
   const cur=H.getAttribute("data-text-scale")||"";
